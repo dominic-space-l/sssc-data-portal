@@ -1,0 +1,5 @@
+- Schema has extra MesowestLink column in Stations, removed in SQLite draft
+- Schema has no table for station_type, for next draft
+- Table for ReliableReadings, for next draft
+- ExperimentalPlot in ReadingTypes should be elsewhere, for next draft
+- Rename seismometer and thermometer to be consistent with other cols, next draft
