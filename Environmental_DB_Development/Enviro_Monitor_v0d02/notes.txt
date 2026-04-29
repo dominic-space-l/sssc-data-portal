@@ -1,0 +1,67 @@
+Changes:
+- Consolidated Owner1 and Owner2 into Owners table
+- StationLocations removed, now a Coordinates column in Stations (ISO6709 format)
+- Allow StationCode column in Stations to be null
+- Added StationTypes table for station_type column
+- ReadingTypes table exploded
+    - Sensor/Capability types, what is measured
+    (temperature, precip, wind, dew, sea level pres, 
+    altimeter reading, snow amt, wave swell hgt, seismometer)
+    Stations
+    --------
+    StationId (PK)
+    ...
+
+    SensorTypes
+    -----------
+    SensorTypeId (PK)
+    Name
+
+    StationSensors
+    --------------
+    StationId (FK)
+    SensorTypeId (FK)
+    PRIMARY KEY (StationId, SensorTypeId)
+
+    - Station Classification 
+    (hydrologic, weather, coastal, experimentalplot, satellite)
+    StationTags
+    -----------
+    TagId (PK)
+    Name
+
+    StationTagMap
+    -------------
+    StationId (FK)
+    TagId (FK)
+    PRIMARY KEY (StationId, TagId)
+
+    - Operational characteristics go into Stations table
+    (heated, seasonal) 
+    Stations
+    --------
+    ...
+    Heated BOOLEAN
+    Seasonal BOOLEAN
+
+    - Data quality
+    (reliable...)
+    DataQuality
+    -----------
+    StationId (FK)
+    SensorTypeId (FK)
+    QualityType (e.g., "reliable", "forecasting_capable")
+    Value BOOLEAN or ENUM
+    PRIMARY KEY (StationId, SensorTypeId, QualityType)
+
+- Now has tables:
+    Stations (primary)
+    |
+    StationContacts -> Contacts (MtoM)
+    |
+    StationSensors -> SensorTypes (MtoM)
+        StationSensorQuality -> QualityTypes
+    |
+    StationTags -> Tags (MtM)
+    |
+    StationOrganizations -> Organizations+Role (MtM)
