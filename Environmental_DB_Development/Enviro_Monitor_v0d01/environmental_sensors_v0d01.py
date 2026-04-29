@@ -8,7 +8,7 @@ class EnvironmentalSensorsDB:
     """
     
     """
-    def __init__(self, database_name='EnvironmentalSensors.db'):
+    def __init__(self, database_name='Enviro_Monitor_v0d01/EnvironmentalSensors.db'): #
         """
         Connect to the database
         If the database doesn't exist, the database is created
