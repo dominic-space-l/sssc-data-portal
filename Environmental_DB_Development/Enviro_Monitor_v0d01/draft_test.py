@@ -47,7 +47,7 @@ records = db.select_records_Projects()
 print('Projects table records: \n')
 for r in records:
     print(r)
-
+print()
 # Maintainers
 db.insert_record_Maintainers_table('Sitka Sound Science Center') # all SSSC
 db.insert_record_Maintainers_table('Haines Avalanche Center') # lutak
@@ -56,7 +56,7 @@ records = db.select_records_Maintainers()
 print('Maintainers table records: \n')
 for r in records:
     print(r)
-
+print()
 # Owners
 db.insert_record_Owner1_table('Sitka Sound Science Center') # verstovia, harbor, gavan
 db.insert_record_Owner1_table('Hoonah Indian Association') # hoonah mt and association
@@ -67,14 +67,14 @@ records = db.select_records_Owner1()
 print('Owner1 table records: \n')
 for r in records:
     print(r)
-
+print()
 db.insert_record_Owner2_table('Sitka Sound Science Center') # hoonah mt and association
 
 records = db.select_records_Owner2()
 print('Owner2 table records: \n')
 for r in records:
     print(r)
-
+print()
 # Data Providers
 db.insert_record_DataProviders_table('Sitka Sound Science Center') # all SSSC
 db.insert_record_DataProviders_table('Haines Avalanche Center') # lutak
@@ -84,7 +84,7 @@ records = db.select_records_DataProviders()
 print('DataProviders table records: \n')
 for r in records:
     print(r)
-
+print()
 # Contacts
 
 db.insert_record_Contacts_table('Nicolas Mathews', 'nmathews@sitkascience.org') # verstovia, harbor, gavan
@@ -95,7 +95,7 @@ records = db.select_records_Contacts()
 print('Contacts table records: \n')
 for r in records:
     print(r)
-
+print()
 # StationLocations
 db.insert_record_StationLocations_table(57.05464, -135.2964, 732) # verstovia
 db.insert_record_StationLocations_table(57.0886, -135.36392, 2106) # harbor
@@ -109,7 +109,7 @@ records = db.select_records_Contacts()
 print('Contacts table records: \n')
 for r in records:
     print(r)
-
+print()
 # ReadingTypes
 db.insert_record_ReadingTypes_table( # verstovia, harbor, gavan
     Hydrologic=True, Weather=True, Coastal=True, ExperimentalPlot=False, Seismometer=False, Thermometer=True,
@@ -165,7 +165,7 @@ records = db.select_records_ReadingTypes()
 print('ReadingTypes table records: \n')
 for r in records:
     print(r)
-
+print()
 # Stations
 db.insert_record_Stations_table( # verstovia
     StationName="Verstovia", StationCode="Verstovia", RealTime=True, Active=True,
@@ -207,3 +207,5 @@ records = db.select_records_Stations()
 print('Stations table records: \n')
 for r in records:
     print(r)
+    
+print()

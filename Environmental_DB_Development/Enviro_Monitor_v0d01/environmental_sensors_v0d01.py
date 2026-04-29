@@ -16,6 +16,7 @@ class EnvironmentalSensorsDB:
         """
 
         self.connection = sqlite3.connect(database_name, autocommit=False)
+        print(f"Connected to {database_name}\n")
         self.cursor = self.connection.cursor()
 
         self.table_list = [
@@ -32,6 +33,7 @@ class EnvironmentalSensorsDB:
         self.connection.execute(f'DROP TABLE IF EXISTS {table_name}')
         if do_commit:
             self.connection.commit()
+            print(f"Dropped {table_name} table.\n")
 
     def drop_all_tables(self):
         """
@@ -40,6 +42,7 @@ class EnvironmentalSensorsDB:
         for table in self.table_list:
             self.drop_table(table, do_commit=False)
         self.connection.commit()
+        print(f"Dropped all tables.\n")
 
     # ========================
     # Table Creation Functions

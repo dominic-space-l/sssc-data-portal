@@ -1,3 +1,8 @@
+Connected to EnvironmentalSensors.db
+
+Dropped all tables.
+
+--- dump all of the table schemas with a tabular format: verbosity_level=0 ---
 # Projects
 |    Field    |  Type   |
 | ----------- | ------- |
@@ -187,34 +192,41 @@ Projects table records:
 
 (1, 'Precipitation Monitoring')
 (2, 'Alaska Road Weather Information System')
+
 Maintainers table records: 
 
 (1, 'Sitka Sound Science Center')
 (2, 'Haines Avalanche Center')
+
 Owner1 table records: 
 
 (1, 'Sitka Sound Science Center')
 (2, 'Hoonah Indian Association')
 (3, 'Alaska Avalanche Information Center')
 (4, 'Alaska Department of Transportation')
+
 Owner2 table records: 
 
 (1, 'Sitka Sound Science Center')
+
 DataProviders table records: 
 
 (1, 'Sitka Sound Science Center')
 (2, 'Haines Avalanche Center')
 (3, 'National Weather Service')
+
 Contacts table records: 
 
 (1, 'Nicolas Mathews', 'nmathews@sitkascience.org')
 (2, 'Luka Silva', 'lsilva@sitkascience.org')
 (3, 'Erik Stevens', 'estevens@alaskasnow.org')
+
 Contacts table records: 
 
 (1, 'Nicolas Mathews', 'nmathews@sitkascience.org')
 (2, 'Luka Silva', 'lsilva@sitkascience.org')
 (3, 'Erik Stevens', 'estevens@alaskasnow.org')
+
 ReadingTypes table records: 
 
 (1, 1, 1, 1, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, '\n    1 tipping bucket rain gauge, atmospheric pressure, temperature, and humidity, 2 soil moisture sensors, \n    1 piezometer (pres)
@@ -222,6 +234,7 @@ ReadingTypes table records:
 (3, 1, 1, 1, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, '\n    Rainfall, pore pressure, temperature, barometric pressure, relative humidity, soil moisture\n    ')
 (4, 1, 1, 0, 0, 1, 0, None, None, None, None, None, None, None, 1, None, None, None, None, None, None, None, '\n    Rainfall, precipitation (rain and snowfall in antifreeze bucket), snow depth, wind sp)
 (5, 1, 1, 0, 0, 1, 0, 1, 1, 1, None, None, None, None, None, 1, None, 1, 1, 1, 1, 1, None)
+
 Stations table records: 
 
 (1, 'Verstovia', 'Verstovia', 1, 1, None, None, None, 1, 1, 1, None, 1, 1, 1, 1)
@@ -231,3 +244,4 @@ Stations table records:
 (5, 'Hoonah Indian Association', 'Hoonah 2', 1, 0, None, None, None, 5, 3, 2, 1, 1, 1, 1, 2)
 (6, 'Lutak Hillside', 'TBD', None, 0, None, None, None, 6, 4, 3, None, 2, 2, 2, 3)
 (7, 'Hollis Hwy Road Weather Information System', 'HOHA2', 1, 1, 'https://www.weather.gov/wrh/timeseries?site=HOHA2&hours=72', None, None, 7, 5, 4, None, None, None, 3, None)
+
