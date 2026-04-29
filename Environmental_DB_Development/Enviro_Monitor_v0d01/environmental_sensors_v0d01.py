@@ -8,7 +8,7 @@ class EnvironmentalSensorsDB:
     """
     
     """
-    def __init__(self, database_name='EnvironmentalSensors'):
+    def __init__(self, database_name='EnvironmentalSensors.db'):
         """
         Connect to the database
         If the database doesn't exist, the database is created
@@ -79,7 +79,7 @@ class EnvironmentalSensorsDB:
                 FOREIGN KEY(MaintainerID)   REFERENCES Maintainer(MaintainerID),
                 FOREIGN KEY(ProjectID)      REFERENCES Projects(ProjectID),
                 FOREIGN KEY(DataProviderID) REFERENCES DataProviders(DataProviderID),
-                FOREIGN KEY(ContactID)      REFERENCES Contacts(ContactID),
+                FOREIGN KEY(ContactID)      REFERENCES Contacts(ContactID)
             )
             """
         self.connection.execute(command)
@@ -262,7 +262,7 @@ class EnvironmentalSensorsDB:
                 (StationName, StationCode, StationLocID, ReadingTypesID, Owner1ID,
                 RealTime, Active, WebLink, MesowestLink, TransmitTime,
                 Owner2ID, MaintainerID, ProjectID, DataProviderID, ContactID)
-            Values (? ? ? ? ?   ? ? ? ? ?   ? ? ? ? ?)
+            Values (?, ?, ?, ?, ?,   ?, ?, ?, ?, ?,   ?, ?, ?, ?, ?)
             """
         
         self.cursor.execute(command, (
@@ -309,7 +309,7 @@ class EnvironmentalSensorsDB:
                 SkyConditions, SeaLevelPressure, WaveSwellHeight, Altimeter,
                 SnowAmount, Heated, Seasonal, ReliablePrecip, ReliableForcsting,
                 ReliableDewPoint, ReliableWind, ReliableTemp, AdditnInfo)
-            Values (? ? ? ?   ? ? ? ? ?  ? ? ? ?  ? ? ? ? ?   ? ? ? ?)
+            Values (?, ?, ?, ?,   ?, ?, ?, ?, ?,  ?, ?, ?, ?,  ?, ?, ?, ?, ?,   ?, ?, ?, ?)
             """
         
         self.cursor.execute(command, (
@@ -335,7 +335,7 @@ class EnvironmentalSensorsDB:
         command = """
             INSERT INTO StationLocations
                 (Latitude, Longitude, ElevationFT)
-            Values (? ? ?)
+            Values (?, ?, ?)
             """
         
         self.cursor.execute(command, (
@@ -356,12 +356,10 @@ class EnvironmentalSensorsDB:
         command = """
             INSERT INTO Contacts
                 (ContactName, ContactEmail)
-            Values (? ?)
+            Values (?, ?)
             """
         
-        self.cursor.execute(command, (
-            ContactName, ContactEmail
-        ))
+        self.cursor.execute(command, (ContactName, ContactEmail))
         if do_commit:
             self.connection.commit()
 
@@ -379,9 +377,7 @@ class EnvironmentalSensorsDB:
             Values (?)
             """
         
-        self.cursor.execute(command, (
-            ProviderName
-        ))
+        self.cursor.execute(command, (ProviderName,))
         if do_commit:
             self.connection.commit()
 
@@ -399,9 +395,7 @@ class EnvironmentalSensorsDB:
             Values (?)
             """
         
-        self.cursor.execute(command, (
-            Owner1Name
-        ))
+        self.cursor.execute(command, (Owner1Name,))
         if do_commit:
             self.connection.commit()
 
@@ -419,9 +413,7 @@ class EnvironmentalSensorsDB:
             Values (?)
             """
         
-        self.cursor.execute(command, (
-            Owner2Name
-        ))
+        self.cursor.execute(command, (Owner2Name,))
         if do_commit:
             self.connection.commit()
 
@@ -439,9 +431,7 @@ class EnvironmentalSensorsDB:
             Values (?)
             """
         
-        self.cursor.execute(command, (
-            MaintainerName
-        ))
+        self.cursor.execute(command, (MaintainerName,))
         if do_commit:
             self.connection.commit()
 
@@ -459,9 +449,7 @@ class EnvironmentalSensorsDB:
             Values (?)
             """
         
-        self.cursor.execute(command, (
-            ProjectName
-        ))
+        self.cursor.execute(command, (ProjectName,))
         if do_commit:
             self.connection.commit()
 
