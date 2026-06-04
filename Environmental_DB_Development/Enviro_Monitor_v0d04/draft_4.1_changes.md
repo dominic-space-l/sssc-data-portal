@@ -7,3 +7,4 @@
 +   Organizations
 + Added *Longitude*, *Latitude*, *Elevation (FT)*, and *CoordinateLocation* to **Stations**
 + Renamed *ComplexCoordinateLocation* to *CoordinateLocation* in **StationSites**
++ Noted Nullable columns with **?**
