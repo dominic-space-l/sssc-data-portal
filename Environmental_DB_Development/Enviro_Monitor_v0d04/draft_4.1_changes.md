@@ -5,4 +5,5 @@
 +   DeviceSpecifications
 +   Contacts
 +   Organizations
-+ Added *Longitude*, *Latitude*, *Elevation (FT)*, and *ComplexCoordinateLocation* to **Stations**
++ Added *Longitude*, *Latitude*, *Elevation (FT)*, and *CoordinateLocation* to **Stations**
++ Renamed *ComplexCoordinateLocation* to *CoordinateLocation* in **StationSites**
