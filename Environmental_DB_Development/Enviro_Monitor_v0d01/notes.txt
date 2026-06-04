@@ -1,0 +1,10 @@
+- Schema has extra MesowestLink column in Stations, removed in this draft
+- Schema has no table for station_type, for next draft
+- Separate table for ReliableReadings, for next draft
+- ExperimentalPlot in ReadingTypes should be elsewhere, for next draft
+- Rename seismometer and thermometer to be consistent with other cols, next draft
+- Collapse Owner1 and Owner2
+- Should location be collapsed to the core station table? Not multiple stations per coords
+    - Have a 'coords' column of ISO6709 Format
+- Forgot satellite, precip
+- Station ID has nulls in the form of "TBD"
