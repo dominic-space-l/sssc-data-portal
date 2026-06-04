@@ -28,6 +28,7 @@
 
 ### (NEW) StationRoles
 * Columns *RoleID*, *RoleTitle*
+* Added RoleNotes
 
 ### OrganizationProjects
 * Added *ProjectNotes* column
@@ -55,9 +56,11 @@
 
 ### Sensors
 * Broke off *Manufacturer* and *ModelNumber* columns. Now **Sensors** references **DeviceSpecifications** with the **SensorsToSpecs** linking table
+* Added *SensorNotes*
 
 ### Stations
 * Now **Sensors** references **DeviceSpecifications** with the **StationsToSpecs** linking table
+* Rename *Notes* to *StationNotes*
 
 ### (NEW) DeviceSpecifications
 * Columns *DevicesSpecificationID*, *ManufacturerID*, *ModelNumber*, *ModelName*
