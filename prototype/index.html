@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Data Portal Prototype</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 720px; margin: 2rem auto; padding: 0 1rem; line-height: 1.5; }
+    button { padding: .5rem 1rem; margin-right: .5rem; }
+    pre { background: #f4f4f4; padding: .75rem; white-space: pre-wrap; }
+  </style>
+</head>
+<body>
+  <h1>Data Portal Prototype</h1>
+  <p>Bare-bones test pages. Not the real website.</p>
+
+  <h2>Pages</h2>
+  <ul>
+    <li><a href="login.html">Login</a></li>
+    <li><a href="form.html">Form</a></li>
+    <li><a href="csv-upload.html">CSV Upload</a></li>
+    <li><a href="request-access.html">Request Access</a></li>
+    <li><a href="submit.html">Submit by Link</a></li>
+    <li><a href="admin.html">Admin Dashboard</a></li>
+  </ul>
+
+  <h2>Day 1 checks</h2>
+  <button id="db">Test database connection</button>
+  <button id="email">Send test email</button>
+  <pre id="out">Results show here.</pre>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="config.js"></script>
+  <script src="auth/auth.js"></script>
+  <script>
+    const out = document.getElementById("out");
+    const show = (label, result) => { out.textContent = label + "\n" + JSON.stringify(result, null, 2); };
+    document.getElementById("db").onclick = async () => show("Database:", await Auth.testConnection());
+    document.getElementById("email").onclick = async () => show("Email:", await Auth.sendTestEmail());
+  </script>
+</body>
+</html>

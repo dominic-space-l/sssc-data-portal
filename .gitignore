@@ -1,0 +1,9 @@
+# Never commit secrets
+.env
+.env.*
+supabase/.temp/
+supabase/.branches/
+node_modules/
+public/
+schema.sql
+.DS_Store
