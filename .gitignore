@@ -1,0 +1,23 @@
+# Node / npm workspaces (dependencies are hoisted to the repo root)
+node_modules/
+npm-debug.log*
+
+# Angular build output and cache
+.angular/
+dist/
+out-tsc/
+coverage/
+
+# Environment variables / secrets
+.env
+.env.*
+!.env.example
+
+# Editors
+.vscode/*
+!.vscode/extensions.json
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db

@@ -1,0 +1,25 @@
+:host {
+  position: relative;
+  display: block;
+  height: 100%;
+}
+
+.map {
+  height: 100%;
+}
+
+.status {
+  position: absolute;
+  right: 10px;
+  bottom: 24px;
+  z-index: 1000; // above Leaflet panes
+  padding: 4px 8px;
+  border-radius: 4px;
+  background: #fff;
+  box-shadow: 0 1px 4px rgb(0 0 0 / 30%);
+  font: 12px/1.4 sans-serif;
+
+  &.down {
+    color: #b00020;
+  }
+}
