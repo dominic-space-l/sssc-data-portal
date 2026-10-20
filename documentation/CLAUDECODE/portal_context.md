@@ -1,0 +1,1 @@
+# Context for `.portal/` for AI coding agents

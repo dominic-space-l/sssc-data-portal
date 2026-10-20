@@ -1,0 +1,88 @@
+# ============================================================
+# Python / uv
+# ============================================================
+# Note: uv.lock and .python-version SHOULD be committed.
+.venv/
+venv/
+env/
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+build/
+dist/
+wheels/
+*.egg-info/
+*.egg
+.eggs/
+pip-wheel-metadata/
+.mypy_cache/
+.ruff_cache/
+.pytype/
+.pyre/
+
+# ============================================================
+# Flask
+# ============================================================
+instance/
+.webassets-cache
+flask_session/
+
+# ============================================================
+# Environment variables / secrets (Supabase keys, Flask secrets)
+# ============================================================
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# ============================================================
+# Supabase CLI (local dev)
+# ============================================================
+supabase/.branches/
+supabase/.temp/
+supabase/.env
+supabase/.env.*
+!supabase/.env.example
+
+# ============================================================
+# pytest / coverage
+# ============================================================
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+*.cover
+.hypothesis/
+.tox/
+.nox/
+junit*.xml
+
+# ============================================================
+# Editors / IDEs
+# ============================================================
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+.idea/
+*.swp
+*.swo
+*~
+.history/
+
+# ============================================================
+# OS
+# ============================================================
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# ============================================================
+# Logs
+# ============================================================
+*.log
+logs/

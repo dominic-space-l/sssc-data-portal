@@ -1,0 +1,10 @@
+/* You can add global styles to this file, and also import other style files */
+@use 'leaflet/dist/leaflet';
+
+html,
+body,
+map-root {
+  display: block;
+  height: 100%;
+  margin: 0;
+}
