@@ -52,9 +52,10 @@
     $("table").value = cfg.FORM_TABLE || cfg.TEST_TABLE;
 
     const user = await Auth.getUser();
+    if (!user) location.replace("login.html");
     $("who").textContent = user
       ? `Logged in as ${user.email}. Submissions save directly.`
-      : "Not logged in. Submissions should be blocked (that is part of the test).";
+      : "Not logged in.";
 
     let pending = null;
 

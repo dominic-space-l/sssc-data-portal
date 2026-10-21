@@ -24,6 +24,19 @@ function db() {
 
 const fail = (error) => ({ ok: false, message: error.message ?? String(error) });
 
+/** Calls an Edge Function and always returns { ok, ... } with a readable message on errors. */
+async function callFunction(name, body) {
+  const { data, error } = await db().functions.invoke(name, { body });
+  if (!error) return data;
+  try {
+    const detail = await error.context?.json?.();
+    if (detail?.message) return { ok: false, message: detail.message };
+  } catch {
+    // fall through to the generic message
+  }
+  return fail(error);
+}
+
 // ---------------------------------------------------------------------------
 // Day 1: connection checks
 // ---------------------------------------------------------------------------
@@ -32,14 +45,6 @@ export async function testConnection(table) {
   const { data, error } = await db().from(table).select("*").limit(1);
   if (error) return fail(error);
   return { ok: true, rows: data.length };
-}
-
-export async function sendTestEmail() {
-  const { data, error } = await db().functions.invoke("send-test-email", {
-    body: { note: "Test from the prototype site" },
-  });
-  if (error) return fail(error);
-  return { ok: true, data };
 }
 
 // ---------------------------------------------------------------------------
@@ -120,4 +125,28 @@ export async function checkLoggedOutBlocked(table) {
   }
   if (error) return { ok: false, message: `Got past the security rules (failed later instead): ${error.message}` };
   return { ok: false, message: "A logged-out visitor added a row. The security rules are not working." };
+}
+
+// ---------------------------------------------------------------------------
+// Day 3: access requests (outside organizations) and the admin dashboard
+// ---------------------------------------------------------------------------
+
+/** Public. form: { orgName, contactName, email, reason, turnstileToken } */
+export function requestAccess(form) {
+  return callFunction("request-access", form);
+}
+
+/** Admin only. Returns { ok, requests: [...] } */
+export function listAccessRequests() {
+  return callFunction("admin-api", { action: "list_requests" });
+}
+
+/** Admin only. Returns { ok, link, expiresAt, email, orgName } */
+export function approveRequest(id) {
+  return callFunction("admin-api", { action: "approve_request", id });
+}
+
+/** Admin only. Returns { ok, email, orgName } */
+export function rejectRequest(id) {
+  return callFunction("admin-api", { action: "reject_request", id });
 }

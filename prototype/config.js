@@ -7,5 +7,7 @@ window.APP_CONFIG = {
   SUPABASE_PUBLISHABLE_KEY: "sb_publishable_UycXMxK1xdrMYxW6X533_A_-AJVWIX8",
   // Any existing table, used only for the Day 1 connection check.
   TEST_TABLE: "Organizations",
-  FORM_TABLE: "Organizations",
+  FORM_TABLE: "Sensors",
+  TURNSTILE_SITE_KEY: "1x00000000000000000000AA",
+  CONTACT_EMAIL: "lisiecd@wwu.edu",
 };
