@@ -15,7 +15,7 @@
     .muted { color: #666; }
   </style>
 </head>
-<body>
+<body hidden>
   <p><a href="index.html">Back</a></p>
   <h1>Admin dashboard</h1>
   <p class="bar" id="who">checking...</p>
@@ -39,7 +39,8 @@
 
     const $ = (id) => document.getElementById(id);
     const user = await Auth.getUser();
-    if (!user) location.replace("login.html");
+    if (!user) { location.replace("login.html?next=admin.html"); throw new Error("Not logged in"); }
+    document.body.hidden = false;
     $("who").textContent = `Logged in as ${user?.email ?? ""}`;
 
     // Builds an element with plain text only (never HTML), so request text can't inject anything.

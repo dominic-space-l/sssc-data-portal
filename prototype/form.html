@@ -14,7 +14,7 @@
     .bar { background: #eef3fb; padding: .5rem .75rem; border-radius: 6px; }
   </style>
 </head>
-<body>
+<body hidden>
   <p><a href="index.html">Back</a></p>
   <h1>Form (admin submits directly)</h1>
   <p class="bar" id="who">checking...</p>
@@ -52,7 +52,8 @@
     $("table").value = cfg.FORM_TABLE || cfg.TEST_TABLE;
 
     const user = await Auth.getUser();
-    if (!user) location.replace("login.html");
+    if (!user) { location.replace("login.html?next=form.html"); throw new Error("Not logged in"); }
+    document.body.hidden = false;
     $("who").textContent = user
       ? `Logged in as ${user.email}. Submissions save directly.`
       : "Not logged in.";

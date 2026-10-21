@@ -29,8 +29,18 @@
     Auth.initAuth(window.APP_CONFIG);
     const msg = document.getElementById("msg");
 
+    // Where to go after logging in, e.g. login.html?next=admin.html. Only plain local page names allowed.
+    const requested = new URLSearchParams(location.search).get("next") ?? "";
+    const next = /^[a-z0-9-]+\.html$/i.test(requested) ? requested : "admin.html";
+
     const current = await Auth.getUser();
-    if (current) msg.textContent = `Already logged in as ${current.email}.`;
+    if (current) {
+      msg.textContent = `Already logged in as ${current.email}. `;
+      const go = document.createElement("a");
+      go.href = next;
+      go.textContent = "Continue";
+      msg.append(go);
+    }
 
     document.getElementById("login").onsubmit = async (e) => {
       e.preventDefault();
@@ -40,8 +50,8 @@
         document.getElementById("password").value,
       );
       if (result.ok) {
-        msg.textContent = `Logged in as ${result.user.email}. Going to the form...`;
-        setTimeout(() => (location.href = "form.html"), 800);
+        msg.textContent = `Logged in as ${result.user.email}. Continuing...`;
+        location.replace(next);
       } else {
         msg.textContent = `Login failed: ${result.message}`;
       }
