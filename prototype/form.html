@@ -4,15 +4,82 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Form | Prototype</title>
-  <style>body { font-family: system-ui, sans-serif; max-width: 720px; margin: 2rem auto; padding: 0 1rem; }</style>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 760px; margin: 2rem auto; padding: 0 1rem; line-height: 1.5; }
+    label { display: block; margin-top: .75rem; }
+    input, textarea { width: 100%; padding: .45rem; box-sizing: border-box; font-family: ui-monospace, monospace; }
+    textarea { min-height: 9rem; }
+    button { margin: 1rem .4rem 0 0; padding: .5rem 1rem; }
+    pre { background: #f4f4f4; padding: .75rem; white-space: pre-wrap; }
+    .bar { background: #eef3fb; padding: .5rem .75rem; border-radius: 6px; }
+  </style>
 </head>
 <body>
   <p><a href="index.html">Back</a></p>
-  <h1>Form</h1>
-  <p>Placeholder. Built on Day 2.</p>
+  <h1>Form (admin submits directly)</h1>
+  <p class="bar" id="who">checking...</p>
+  <p>Bare-bones test form. The real form comes from the partner's site. Type the row as JSON using the
+     table's real column names (see the Table Editor). Fill in every required column.</p>
 
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <section id="entry">
+    <label>Table <input id="table" /></label>
+    <label>Row (JSON)
+      <textarea id="row">{
+  "ColumnName": "value"
+}</textarea>
+    </label>
+    <button id="review">Review</button>
+  </section>
+
+  <section id="confirm" hidden>
+    <h2>Review before submitting</h2>
+    <p>This will be saved to <strong id="confirmTable"></strong>:</p>
+    <pre id="preview"></pre>
+    <button id="submit">Confirm and submit</button>
+    <button id="back">Edit</button>
+  </section>
+
+  <pre id="out">Results show here.</pre>
+
   <script src="config.js"></script>
-  <script src="auth/auth.js"></script>
+  <script type="module">
+    import * as Auth from "./auth/auth.js";
+    const cfg = window.APP_CONFIG;
+    Auth.initAuth(cfg);
+
+    const $ = (id) => document.getElementById(id);
+    const out = (label, result) => { $("out").textContent = `${label}\n${JSON.stringify(result, null, 2)}`; };
+    $("table").value = cfg.FORM_TABLE || cfg.TEST_TABLE;
+
+    const user = await Auth.getUser();
+    $("who").textContent = user
+      ? `Logged in as ${user.email}. Submissions save directly.`
+      : "Not logged in. Submissions should be blocked (that is part of the test).";
+
+    let pending = null;
+
+    $("review").onclick = () => {
+      try {
+        pending = { table: $("table").value.trim(), row: JSON.parse($("row").value) };
+      } catch (err) {
+        out("Not valid JSON:", { message: err.message });
+        return;
+      }
+      $("confirmTable").textContent = pending.table;
+      $("preview").textContent = JSON.stringify(pending.row, null, 2);
+      $("entry").hidden = true;
+      $("confirm").hidden = false;
+    };
+
+    $("back").onclick = () => { $("confirm").hidden = true; $("entry").hidden = false; };
+
+    $("submit").onclick = async () => {
+      out("Submitting...", {});
+      const result = await Auth.submitForm(pending.table, pending.row);
+      out("Submit result:", result);
+      $("confirm").hidden = true;
+      $("entry").hidden = false;
+    };
+  </script>
 </body>
 </html>

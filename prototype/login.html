@@ -4,15 +4,48 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Login | Prototype</title>
-  <style>body { font-family: system-ui, sans-serif; max-width: 720px; margin: 2rem auto; padding: 0 1rem; }</style>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 420px; margin: 2rem auto; padding: 0 1rem; line-height: 1.5; }
+    label { display: block; margin-top: .75rem; }
+    input { width: 100%; padding: .45rem; box-sizing: border-box; }
+    button { margin-top: 1rem; padding: .5rem 1rem; }
+    #msg { margin-top: 1rem; }
+  </style>
 </head>
 <body>
   <p><a href="index.html">Back</a></p>
-  <h1>Login</h1>
-  <p>Placeholder. Built on Day 2.</p>
+  <h1>Admin login</h1>
 
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <form id="login">
+    <label>Email <input id="email" type="email" autocomplete="username" required /></label>
+    <label>Password <input id="password" type="password" autocomplete="current-password" required /></label>
+    <button type="submit">Log in</button>
+  </form>
+  <p id="msg"></p>
+
   <script src="config.js"></script>
-  <script src="auth/auth.js"></script>
+  <script type="module">
+    import * as Auth from "./auth/auth.js";
+    Auth.initAuth(window.APP_CONFIG);
+    const msg = document.getElementById("msg");
+
+    const current = await Auth.getUser();
+    if (current) msg.textContent = `Already logged in as ${current.email}.`;
+
+    document.getElementById("login").onsubmit = async (e) => {
+      e.preventDefault();
+      msg.textContent = "Logging in...";
+      const result = await Auth.login(
+        document.getElementById("email").value.trim(),
+        document.getElementById("password").value,
+      );
+      if (result.ok) {
+        msg.textContent = `Logged in as ${result.user.email}. Going to the form...`;
+        setTimeout(() => (location.href = "form.html"), 800);
+      } else {
+        msg.textContent = `Login failed: ${result.message}`;
+      }
+    };
+  </script>
 </body>
 </html>
