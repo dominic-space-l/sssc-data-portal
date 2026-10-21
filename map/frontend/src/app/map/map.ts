@@ -5,9 +5,9 @@ import iconUrl from 'leaflet/dist/images/marker-icon.png';
 import shadowUrl from 'leaflet/dist/images/marker-shadow.png';
 import { Api } from '../services/api';
 
-// Placeholder view: WWU, Bellingham
-const INITIAL_CENTER: L.LatLngExpression = [48.734, -122.487];
-const INITIAL_ZOOM = 14;
+// Placeholder view: Sitka, AK
+const INITIAL_CENTER: L.LatLngExpression = [57.04907, -135.33905];
+const INITIAL_ZOOM = 10;
 
 // Leaflet guesses its default marker image paths from leaflet.css, which breaks once the
 // bundler renames the files, so point it at the bundled URLs directly.
