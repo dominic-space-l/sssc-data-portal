@@ -3,12 +3,103 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Submit by Link | Prototype</title>
-  <style>body { font-family: system-ui, sans-serif; max-width: 720px; margin: 2rem auto; padding: 0 1rem; }</style>
+  <title>Submit Data | Prototype</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 760px; margin: 2rem auto; padding: 0 1rem; line-height: 1.5; }
+    label { display: block; margin-top: .75rem; }
+    input, textarea { width: 100%; padding: .45rem; box-sizing: border-box; font-family: ui-monospace, monospace; }
+    textarea { min-height: 9rem; }
+    button { margin: 1rem .4rem 0 0; padding: .5rem 1rem; }
+    pre { background: #f4f4f4; padding: .75rem; white-space: pre-wrap; }
+    .bar { background: #eef3fb; padding: .5rem .75rem; border-radius: 6px; }
+    .error { background: #fdf0f0; border: 1px solid #f1c6c6; padding: .5rem .75rem; border-radius: 6px; }
+  </style>
 </head>
 <body>
-  <p><a href="index.html">Back</a></p>
-  <h1>Submit by Link</h1>
-  <p>Placeholder. Built on Day 4.</p>
+  <h1>Submit data</h1>
+  <p id="status" class="bar">Checking your link...</p>
+
+  <section id="entry" hidden>
+    <p>Bare-bones test form. The real form comes from the partner's site. Type a row as JSON for the default
+       table below, or a list of parts (<code>[{"table": ..., "rows": [...]}, ...]</code>) for several tables.</p>
+    <label>Default table <input id="table" readonly /></label>
+    <label>Data (JSON)
+      <textarea id="row">{
+  "ColumnName": "value"
+}</textarea>
+    </label>
+    <button id="review">Review</button>
+  </section>
+
+  <section id="confirm" hidden>
+    <h2>Review before submitting</h2>
+    <p>This link works <strong>once</strong>. Check everything before you submit.</p>
+    <pre id="preview"></pre>
+    <button id="submit">Confirm and submit</button>
+    <button id="back">Edit</button>
+  </section>
+
+  <p id="msg"></p>
+  <p>Questions? Contact <a id="contact"></a>.</p>
+
+  <script src="config.js"></script>
+  <script type="module">
+    import * as Auth from "./auth/auth.js";
+    const cfg = window.APP_CONFIG;
+    Auth.initAuth(cfg);
+
+    const $ = (id) => document.getElementById(id);
+    $("contact").textContent = cfg.CONTACT_EMAIL;
+    $("contact").href = "mailto:" + cfg.CONTACT_EMAIL;
+    $("table").value = cfg.FORM_TABLE;
+
+    const code = new URLSearchParams(location.search).get("code") ?? "";
+    const showError = (text) => { $("msg").textContent = text; $("msg").className = "error"; };
+
+    if (!code) {
+      $("status").textContent = "This page needs a link from us. Request access first.";
+    } else {
+      const link = await Auth.checkLink(code);
+      if (!link.ok) {
+        $("status").textContent = link.message;
+      } else {
+        const expires = new Date(link.expiresAt).toLocaleDateString();
+        $("status").textContent = `Submitting for ${link.orgName ?? "your organization"}. This link works once and expires on ${expires}.`;
+        $("entry").hidden = false;
+      }
+    }
+
+    let parts = null;
+
+    $("review").onclick = () => {
+      $("msg").textContent = ""; $("msg").className = "";
+      try {
+        parts = Auth.toParts(JSON.parse($("row").value), cfg.FORM_TABLE);
+      } catch (err) {
+        return showError(`That isn't valid JSON: ${err.message}`);
+      }
+      $("preview").textContent = JSON.stringify(parts, null, 2);
+      $("entry").hidden = true;
+      $("confirm").hidden = false;
+    };
+
+    $("back").onclick = () => { $("confirm").hidden = true; $("entry").hidden = false; };
+
+    $("submit").onclick = async () => {
+      $("submit").disabled = true;
+      $("msg").textContent = "Submitting..."; $("msg").className = "";
+      const result = await Auth.submitWithLink(code, parts);
+      $("submit").disabled = false;
+      $("confirm").hidden = true;
+      if (result.ok) {
+        $("status").textContent = "Thanks! Your submission was received and will be reviewed. This link no longer works.";
+        $("msg").textContent = "";
+      } else {
+        // Nothing was saved and the link still works, so they can fix it and try again.
+        $("entry").hidden = !!result.linkState;
+        showError(result.message);
+      }
+    };
+  </script>
 </body>
 </html>

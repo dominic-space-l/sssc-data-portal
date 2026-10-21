@@ -5,32 +5,38 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Admin Dashboard | Prototype</title>
   <style>
-    body { font-family: system-ui, sans-serif; max-width: 960px; margin: 2rem auto; padding: 0 1rem; line-height: 1.5; }
+    body { font-family: system-ui, sans-serif; max-width: 1040px; margin: 2rem auto; padding: 0 1rem; line-height: 1.5; }
     table { border-collapse: collapse; width: 100%; }
     th, td { border-bottom: 1px solid #ddd; padding: .5rem; text-align: left; vertical-align: top; }
-    button { padding: .35rem .8rem; margin-right: .3rem; }
+    button { padding: .35rem .8rem; margin: 0 .3rem .3rem 0; }
     .bar { background: #eef3fb; padding: .5rem .75rem; border-radius: 6px; }
     #result { background: #f4f9f4; border: 1px solid #cde3cd; padding: .75rem; border-radius: 6px; margin: 1rem 0; }
     #result input { width: 100%; padding: .4rem; box-sizing: border-box; font-family: ui-monospace, monospace; }
     .muted { color: #666; }
+    .preview { overflow-x: auto; max-width: 100%; }
+    .preview table { font-size: .85rem; }
+    .preview th, .preview td { padding: .2rem .4rem; border: 1px solid #e3e3e3; }
   </style>
 </head>
 <body hidden>
   <p><a href="index.html">Back</a></p>
   <h1>Admin dashboard</h1>
   <p class="bar" id="who">checking...</p>
+  <p><button id="refresh">Refresh</button></p>
 
   <div id="result" hidden></div>
 
   <h2>Access requests waiting for review</h2>
-  <p><button id="refresh">Refresh</button></p>
   <table>
     <thead><tr><th>Organization</th><th>Contact</th><th>Reason</th><th>Received</th><th></th></tr></thead>
-    <tbody id="requests"><tr><td colspan="5" class="muted">Loading...</td></tr></tbody>
+    <tbody id="requests"></tbody>
   </table>
 
   <h2>Submissions waiting for review</h2>
-  <p class="muted">Coming on Day 4.</p>
+  <table>
+    <thead><tr><th>From</th><th>Data</th><th>Received</th><th></th></tr></thead>
+    <tbody id="submissions"></tbody>
+  </table>
 
   <script src="config.js"></script>
   <script type="module">
@@ -41,9 +47,11 @@
     const user = await Auth.getUser();
     if (!user) { location.replace("login.html?next=admin.html"); throw new Error("Not logged in"); }
     document.body.hidden = false;
-    $("who").textContent = `Logged in as ${user?.email ?? ""}`;
+    $("who").textContent = `Logged in as ${user.email}`;
 
-    // Builds an element with plain text only (never HTML), so request text can't inject anything.
+    const PREVIEW_ROWS = 10;
+
+    // Builds an element with plain text only (never HTML), so submitted text can't inject anything.
     const el = (tag, text, attrs = {}) => {
       const node = document.createElement(tag);
       if (text != null) node.textContent = text;
@@ -52,25 +60,44 @@
     };
 
     const mailto = (to, subject, body) =>
-      `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+      `mailto:${encodeURIComponent(to ?? "")}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
 
     function showResult(nodes) {
       const box = $("result");
       box.replaceChildren(...nodes);
       box.hidden = false;
+      box.scrollIntoView({ behavior: "smooth", block: "nearest" });
     }
 
-    async function load() {
+    function linkResult(intro, result, emailSubject, emailIntro) {
+      const expires = new Date(result.expiresAt).toLocaleDateString();
+      const copy = el("button", "Copy link");
+      copy.onclick = async () => { await navigator.clipboard.writeText(result.link); copy.textContent = "Copied"; };
+      const draft = el("a", "Open an email draft to them", {
+        href: mailto(result.email, emailSubject,
+          `Hi,\n\n${emailIntro}\n\n${result.link}\n\nThe link works once and expires on ${expires}.\n\nThanks`),
+      });
+      showResult([
+        el("p", `${intro} One-time link (expires ${expires}):`),
+        el("input", null, { value: result.link, readOnly: true }),
+        el("p", null), copy, el("span", "  "), draft,
+      ]);
+    }
+
+    function messageRow(body, columns, text) {
+      const row = el("tr");
+      row.append(el("td", text, { colSpan: columns, className: "muted" }));
+      body.replaceChildren(row);
+    }
+
+    // ---------------- Access requests ----------------
+
+    async function loadRequests() {
       const body = $("requests");
-      const message = (text) => {
-        const row = el("tr");
-        row.append(el("td", text, { colSpan: 5, className: "muted" }));
-        body.replaceChildren(row);
-      };
-      message("Loading...");
+      messageRow(body, 5, "Loading...");
       const result = await Auth.listAccessRequests();
-      if (!result.ok) return message(`Error: ${result.message}`);
-      if (result.requests.length === 0) return message("Nothing waiting.");
+      if (!result.ok) return messageRow(body, 5, `Error: ${result.message}`);
+      if (result.requests.length === 0) return messageRow(body, 5, "Nothing waiting.");
       body.replaceChildren();
       for (const r of result.requests) {
         const row = el("tr");
@@ -83,15 +110,15 @@
         const actions = el("td");
         const approve = el("button", "Approve");
         const reject = el("button", "Reject");
-        approve.onclick = () => decide(r, true, approve, reject);
-        reject.onclick = () => decide(r, false, approve, reject);
+        approve.onclick = () => decideRequest(r, true, [approve, reject]);
+        reject.onclick = () => decideRequest(r, false, [approve, reject]);
         actions.append(approve, reject);
         row.append(actions);
         body.append(row);
       }
     }
 
-    async function decide(r, approved, ...buttons) {
+    async function decideRequest(r, approved, buttons) {
       buttons.forEach((b) => (b.disabled = true));
       const result = approved ? await Auth.approveRequest(r.id) : await Auth.rejectRequest(r.id);
       if (!result.ok) {
@@ -99,32 +126,107 @@
         buttons.forEach((b) => (b.disabled = false));
         return;
       }
-
       if (approved) {
-        const expires = new Date(result.expiresAt).toLocaleDateString();
-        const linkBox = el("input", null, { value: result.link, readOnly: true });
-        const copy = el("button", "Copy link");
-        copy.onclick = async () => { await navigator.clipboard.writeText(result.link); copy.textContent = "Copied"; };
-        const draft = el("a", "Open an email draft to them", {
-          href: mailto(result.email, "Your data portal link",
-            `Hi,\n\nYour request to submit data has been approved. Use this one-time link to submit:\n\n${result.link}\n\nThe link works once and expires on ${expires}.\n\nThanks`),
-        });
-        showResult([
-          el("p", `Approved ${result.orgName}. One-time link (expires ${expires}):`),
-          linkBox, el("p", null), copy, el("span", "  "), draft,
-        ]);
+        linkResult(`Approved ${result.orgName}.`, result, "Your data portal link",
+          "Your request to submit data has been approved. Use this one-time link to submit:");
       } else {
-        const draft = el("a", "Open an email draft to them", {
-          href: mailto(result.email, "Your data portal access request",
-            `Hi,\n\nThanks for your interest. We aren't able to approve your request at this time.\n\nThanks`),
-        });
-        showResult([el("p", `Rejected ${result.orgName}. Let them know if you'd like: `), draft]);
+        showResult([
+          el("p", `Rejected ${result.orgName}. Let them know if you'd like: `),
+          el("a", "Open an email draft to them", {
+            href: mailto(result.email, "Your data portal access request",
+              "Hi,\n\nThanks for your interest. We aren't able to approve your request at this time.\n\nThanks"),
+          }),
+        ]);
       }
-      load();
+      loadRequests();
     }
 
-    $("refresh").onclick = load;
-    load();
+    // ---------------- Submissions ----------------
+
+    function previewTable(rows) {
+      const columns = [...new Set(rows.flatMap((r) => Object.keys(r)))];
+      const table = el("table");
+      const head = el("tr");
+      columns.forEach((c) => head.append(el("th", c)));
+      table.append(head);
+      for (const r of rows.slice(0, PREVIEW_ROWS)) {
+        const tr = el("tr");
+        columns.forEach((c) => {
+          const v = r[c];
+          const text = v == null ? "" : typeof v === "object" && v.$ref ? `→ new row "${v.$ref}"` : String(v);
+          tr.append(el("td", text));
+        });
+        table.append(tr);
+      }
+      const wrap = el("div", null, { className: "preview" });
+      wrap.append(table);
+      if (rows.length > PREVIEW_ROWS) wrap.append(el("p", `...and ${rows.length - PREVIEW_ROWS} more rows`, { className: "muted" }));
+      return wrap;
+    }
+
+    async function loadSubmissions() {
+      const body = $("submissions");
+      messageRow(body, 4, "Loading...");
+      const result = await Auth.listSubmissions();
+      if (!result.ok) return messageRow(body, 4, `Error: ${result.message}`);
+      if (result.submissions.length === 0) return messageRow(body, 4, "Nothing waiting.");
+      body.replaceChildren();
+      for (const s of result.submissions) {
+        const row = el("tr");
+        const data = el("td");
+        data.append(el("p", `${s.row_count} row${s.row_count === 1 ? "" : "s"} in ${s.parts.length} table${s.parts.length === 1 ? "" : "s"}`));
+        for (const part of s.parts) {
+          data.append(el("strong", `${part.table} (${part.rows.length})`), previewTable(part.rows));
+        }
+        row.append(
+          el("td", [s.org_name, s.contact_name, s.email].filter(Boolean).join("\n"), { style: "white-space: pre-line" }),
+          data,
+          el("td", new Date(s.submitted_at).toLocaleString()),
+        );
+        const actions = el("td");
+        const approve = el("button", "Approve");
+        const reject = el("button", "Reject");
+        const again = el("button", "Reject + new link");
+        const buttons = [approve, reject, again];
+        approve.onclick = () => decideSubmission(s, "approve", buttons);
+        reject.onclick = () => decideSubmission(s, "reject", buttons);
+        again.onclick = () => decideSubmission(s, "again", buttons);
+        actions.append(approve, el("br"), reject, el("br"), again);
+        row.append(actions);
+        body.append(row);
+      }
+    }
+
+    async function decideSubmission(s, choice, buttons) {
+      buttons.forEach((b) => (b.disabled = true));
+      const result = choice === "approve"
+        ? await Auth.approveSubmission(s.id)
+        : await Auth.rejectSubmission(s.id, choice === "again");
+      if (!result.ok) {
+        showResult([el("p", `Error: ${result.message}`)]);
+        buttons.forEach((b) => (b.disabled = false));
+        return;
+      }
+      if (choice === "approve") {
+        showResult([el("p", `Approved. Saved ${result.saved} row${result.saved === 1 ? "" : "s"} to ${s.parts.map((p) => p.table).join(", ")}.`)]);
+      } else if (choice === "again") {
+        linkResult(`Rejected. New link created for ${result.orgName ?? "them"}.`, result, "Please resubmit your data",
+          "We couldn't accept your last submission. Please fix it and submit again using this new one-time link:");
+      } else {
+        showResult([
+          el("p", "Rejected. Let them know if you'd like: "),
+          el("a", "Open an email draft to them", {
+            href: mailto(result.email, "Your data portal submission",
+              "Hi,\n\nThanks for your submission. We aren't able to accept it.\n\nThanks"),
+          }),
+        ]);
+      }
+      loadSubmissions();
+    }
+
+    const loadAll = () => { loadRequests(); loadSubmissions(); };
+    $("refresh").onclick = loadAll;
+    loadAll();
   </script>
 </body>
 </html>

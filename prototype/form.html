@@ -23,7 +23,7 @@
 
   <section id="entry">
     <label>Table <input id="table" /></label>
-    <label>Row (JSON)
+    <label>Data (JSON): a row, a list of rows, or a list of parts for several tables
       <textarea id="row">{
   "ColumnName": "value"
 }</textarea>
@@ -62,13 +62,13 @@
 
     $("review").onclick = () => {
       try {
-        pending = { table: $("table").value.trim(), row: JSON.parse($("row").value) };
+        pending = Auth.toParts(JSON.parse($("row").value), $("table").value.trim());
       } catch (err) {
         out("Not valid JSON:", { message: err.message });
         return;
       }
-      $("confirmTable").textContent = pending.table;
-      $("preview").textContent = JSON.stringify(pending.row, null, 2);
+      $("confirmTable").textContent = pending.map((p) => p.table).join(", ");
+      $("preview").textContent = JSON.stringify(pending, null, 2);
       $("entry").hidden = true;
       $("confirm").hidden = false;
     };
@@ -77,7 +77,9 @@
 
     $("submit").onclick = async () => {
       out("Submitting...", {});
-      const result = await Auth.submitForm(pending.table, pending.row);
+      // One table with no placeholders: save directly. Several tables or placeholders: save together on the server.
+      const simple = pending.length === 1 && !JSON.stringify(pending).includes('"$ref"') && !JSON.stringify(pending).includes('"_id"');
+      const result = simple ? await Auth.submitForm(pending[0].table, pending[0].rows) : await Auth.submitDirect(pending);
       out("Submit result:", result);
       $("confirm").hidden = true;
       $("entry").hidden = false;

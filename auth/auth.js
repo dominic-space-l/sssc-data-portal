@@ -30,7 +30,7 @@ async function callFunction(name, body) {
   if (!error) return data;
   try {
     const detail = await error.context?.json?.();
-    if (detail?.message) return { ok: false, message: detail.message };
+    if (detail?.message) return { ok: false, ...detail };
   } catch {
     // fall through to the generic message
   }
@@ -149,4 +149,54 @@ export function approveRequest(id) {
 /** Admin only. Returns { ok, email, orgName } */
 export function rejectRequest(id) {
   return callFunction("admin-api", { action: "reject_request", id });
+}
+
+// ---------------------------------------------------------------------------
+// Day 4: one-time links (outside organizations) and reviewing submissions
+// ---------------------------------------------------------------------------
+
+/** Public. Is this link still usable? Returns { ok, orgName, expiresAt } or { ok: false, message }. */
+export function checkLink(code) {
+  return callFunction("submit-external", { action: "check", code });
+}
+
+/**
+ * Public. Held as pending until the admin approves.
+ * parts: [{ table, rows: [...] }, ...] for one or more tables, saved in order.
+ *   Give a new row a label with "_id": "station-1" and point to it from later rows with { "$ref": "station-1" }.
+ */
+export function submitWithLink(code, parts) {
+  return callFunction("submit-external", { action: "submit", code, parts });
+}
+
+/** Public. Rows of a dropdown list (tables in the LOOKUP_TABLES secret). Needs a valid link code. */
+export function getLookup(code, table) {
+  return callFunction("submit-external", { action: "lookup", code, table });
+}
+
+/** Admin only. Returns { ok, submissions: [...] } */
+export function listSubmissions() {
+  return callFunction("admin-api", { action: "list_submissions" });
+}
+
+/** Admin only. Saves the rows into the real table (all or none). Returns { ok, saved } */
+export function approveSubmission(id) {
+  return callFunction("admin-api", { action: "approve_submission", id });
+}
+
+/** Admin only. newLink: true also creates a fresh one-time link. Returns { ok, email, orgName, link?, expiresAt? } */
+export function rejectSubmission(id, newLink = false) {
+  return callFunction("admin-api", { action: "reject_submission", id, newLink });
+}
+
+/** Admin only. Saves one or more tables at once, straight away (all or none). Same parts format as submitWithLink. */
+export function submitDirect(parts) {
+  return callFunction("admin-api", { action: "submit_direct", parts });
+}
+
+/** Helper for pages: turns typed JSON into parts. Accepts parts, or a row / list of rows for defaultTable. */
+export function toParts(data, defaultTable) {
+  const looksLikeParts = Array.isArray(data) && data.length > 0 &&
+    data.every((p) => p && typeof p === "object" && typeof p.table === "string" && "rows" in p);
+  return looksLikeParts ? data : [{ table: defaultTable, rows: Array.isArray(data) ? data : [data] }];
 }
