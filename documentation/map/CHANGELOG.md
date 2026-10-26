@@ -3,6 +3,37 @@
 Versioning follows `xx.yy.zz` (see [documentation/CLAUDECODE/CLAUDE.md](../CLAUDECODE/CLAUDE.md)):
 `xx` = major feature, `yy` = steps/commits toward a major feature, `zz` = small updates and revisions.
 
+## 0.3.5 — 2026-10-26
+
+Fixed the placeholder marker popup. It said "Western Washington University" even though the map has been centered on Sitka since 0.3.1, and now says "Sitka, AK".
+
+**Files changed**
+- `map/frontend/src/app/map/map.ts`
+
+## 0.3.4 — 2026-10-26
+
+Brought the existing map files in line with the rules in `documentation/CLAUDECODE/CLAUDE.md`:
+- Added file headers and docstrings to all code. There are no behavior changes, and Prettier reformatted one import line.
+- Added setup instructions and directory guides to the READMEs.
+- Replaced the empty backend README and the Angular CLI boilerplate frontend README.
+- Added a Conventions section to the plan.
+
+**Files changed**
+- `map/README.md`
+- `map/backend/README.md`
+- `map/backend/src/backend/__init__.py`
+- `map/backend/tests/test_health.py`
+- `map/frontend/README.md`
+- `map/frontend/src/main.ts`
+- `map/frontend/src/assets.d.ts`
+- `map/frontend/src/app/app.config.ts`
+- `map/frontend/src/app/app.routes.ts`
+- `map/frontend/src/app/app.ts`
+- `map/frontend/src/app/app.spec.ts`
+- `map/frontend/src/app/map/map.ts`
+- `map/frontend/src/app/services/api.ts`
+- `documentation/map/map_app_plan.md`
+
 ## 0.3.3 — 2026-10-26
 
 Revised the plan to cover both the frontend and the backend, and renamed it. The plan now centers on a generic layer system, so decisions about what goes on the map can be made later.

@@ -3,6 +3,22 @@
 Versioning follows `xx.yy.zz` (see [documentation/CLAUDECODE/CLAUDE.md](../CLAUDECODE/CLAUDE.md)):
 `xx` = major feature, `yy` = steps/commits toward a major feature, `zz` = small updates and revisions.
 
+## 0.2.1 — 2026-10-26
+
+Brought the existing portal files in line with the rules in `documentation/CLAUDECODE/CLAUDE.md`:
+- Added file headers and docstrings to all code. There are no behavior changes.
+- Added setup instructions and a directory guide to the README.
+- Replaced the Angular CLI boilerplate frontend README, which listed the wrong port (4200 instead of 4201).
+
+**Files changed**
+- `portal/README.md`
+- `portal/frontend/README.md`
+- `portal/frontend/src/main.ts`
+- `portal/frontend/src/app/app.config.ts`
+- `portal/frontend/src/app/app.routes.ts`
+- `portal/frontend/src/app/app.ts`
+- `portal/frontend/src/app/app.spec.ts`
+
 ## 0.2.0 — 2026-10-20
 
 Added the portal frontend frame: an Angular app with the default CLI starter page, which is still a placeholder. Added it to the root npm workspace with a `start:portal` script. (`04b334f`)

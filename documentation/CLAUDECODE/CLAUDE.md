@@ -11,4 +11,4 @@ maintain the CHANGELOG.md for each major directory (map, authentication, portal)
 ## Planning
 Major changes should come with their own plan document, which lives in documentation/map or /portal or /authentication
 ## Directories
-README's should always contain a quickstart guide, setup instructions, and directory guides as minimum. 
+README's should always contain a quickstart guide, setup instructions, and directory guides as minimum.

@@ -1,4 +1,20 @@
-import { Component, DestroyRef, ElementRef, afterNextRender, inject, signal, viewChild } from '@angular/core';
+/**
+ * @fileoverview Full-page Leaflet map view.
+ *
+ * Draws an OpenStreetMap base layer centered on Sitka, AK, and shows the
+ * backend status in a corner badge.
+ * Usage: routed at `''` in `app.routes.ts`; rendered as `<map-map>`.
+ */
+
+import {
+  Component,
+  DestroyRef,
+  ElementRef,
+  afterNextRender,
+  inject,
+  signal,
+  viewChild,
+} from '@angular/core';
 import * as L from 'leaflet';
 import iconRetinaUrl from 'leaflet/dist/images/marker-icon-2x.png';
 import iconUrl from 'leaflet/dist/images/marker-icon.png';
@@ -14,6 +30,7 @@ const INITIAL_ZOOM = 10;
 L.Icon.Default.imagePath = '';
 L.Icon.Default.mergeOptions({ iconRetinaUrl, iconUrl, shadowUrl });
 
+/** Map page: owns the Leaflet map instance and the backend status badge. */
 @Component({
   selector: 'map-map',
   templateUrl: './map.html',
@@ -25,6 +42,12 @@ export class MapView {
 
   protected readonly backendStatus = signal('checking…');
 
+  /**
+   * Creates the Leaflet map after first render and starts the health check.
+   *
+   * Usage: instantiated by Angular; not called directly. The map is removed
+   * when the component is destroyed.
+   */
   constructor() {
     const destroyRef = inject(DestroyRef);
 
@@ -34,7 +57,7 @@ export class MapView {
         maxZoom: 19,
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
       }).addTo(map);
-      L.marker(INITIAL_CENTER).addTo(map).bindPopup('Sitka');
+      L.marker(INITIAL_CENTER).addTo(map).bindPopup('Sitka, AK');
 
       destroyRef.onDestroy(() => map.remove());
     });

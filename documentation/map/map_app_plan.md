@@ -134,6 +134,15 @@ Data flow on the frontend: `MapState` holds what is visible and filtered. `MapVi
 | Frontend state | One signal-based `MapState` service | Components stay decoupled. URL syncing can be added later in one place. |
 | Testing | Generic code tested against `FakeLayer` and `FakeDatabase`; layers tested with fixture rows | Changing content never breaks the framework tests. |
 
+## Conventions (from `documentation/CLAUDECODE/CLAUDE.md`)
+
+Every commit below follows these rules:
+- **File headers:** every new `.py` file starts with a module docstring, and every new `.ts` file starts with a `/** @fileoverview ... */` block. Both state the file's role and how to use it.
+- **Docstrings:** every function and class has one, including test functions. In Python they are Google style (`Args:`, `Returns:`, `Raises:`, plus a `Usage:` example). In TypeScript they are JSDoc (`@param`, `@return`, plus usage), with no type annotations in the JSDoc. Classes get at least a one-line summary.
+- **Style:** Python follows PEP 8 and Google's Python style guide. TypeScript and Angular code follows the Angular v22 style guide and Google's TypeScript style guide; run `npx prettier --write` before committing.
+- **Design:** object-oriented and SOLID where it fits. Layers implement a shared `Layer` protocol (open/closed). Routes depend on `Layer` and `Database` abstractions, not on Supabase directly (dependency inversion). Each module has one job.
+- **READMEs:** any new directory with its own README, and `map/README.md` itself, has at least a quickstart, setup instructions, and a directory guide. Commits that add folders update the directory guides.
+
 ## Commits
 
 Each commit updates [`CHANGELOG.md`](CHANGELOG.md), and backend commits keep `version` in `map/backend/pyproject.toml` in sync with it. Each commit is one step toward this major feature (`yy`). The last commit bumps to `1.0.0`. After every commit, `uv run pytest` (in `map/backend`) and `npm test` (repo root) both pass.

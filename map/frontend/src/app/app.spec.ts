@@ -1,3 +1,9 @@
+/**
+ * @fileoverview Unit tests for the root `App` component.
+ *
+ * Usage: `npm test` from the repo root (Vitest via `ng test`).
+ */
+
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { App } from './app';
@@ -7,8 +13,7 @@ describe('App', () => {
     await TestBed.configureTestingModule({
       imports: [App],
       providers: [provideRouter([])],
-    })
-      .compileComponents();
+    }).compileComponents();
   });
 
   it('should create the app', () => {
