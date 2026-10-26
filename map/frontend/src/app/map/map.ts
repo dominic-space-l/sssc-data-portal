@@ -34,7 +34,7 @@ export class MapView {
         maxZoom: 19,
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
       }).addTo(map);
-      L.marker(INITIAL_CENTER).addTo(map).bindPopup('Western Washington University');
+      L.marker(INITIAL_CENTER).addTo(map).bindPopup('Sitka, AK');
 
       destroyRef.onDestroy(() => map.remove());
     });
