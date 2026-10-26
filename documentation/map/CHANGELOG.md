@@ -3,6 +3,20 @@
 Versioning follows `xx.yy.zz` (see [documentation/CLAUDECODE/CLAUDE.md](../CLAUDECODE/CLAUDE.md)):
 `xx` = major feature, `yy` = steps/commits toward a major feature, `zz` = small updates and revisions.
 
+## 0.3.3 — 2026-10-26
+
+Revised the plan to cover both the frontend and the backend, and renamed it. The plan now centers on a generic layer system, so decisions about what goes on the map can be made later.
+
+**Files changed**
+- `documentation/map/flask_backend_plan.md` → `documentation/map/map_app_plan.md`
+
+## 0.3.2 — 2026-10-26
+
+Added a commit-by-commit plan for the Flask backend, which will serve Supabase station data to the Leaflet map.
+
+**Files changed**
+- `documentation/map/flask_backend_plan.md`
+
 ## 0.3.1 — 2026-10-21
 
 Moved the map's initial view from WWU in Bellingham to Sitka, AK, and zoomed out from 14 to 10. (`089f45a`)
