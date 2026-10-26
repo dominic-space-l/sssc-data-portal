@@ -8,5 +8,7 @@ maintain the CHANGELOG.md for each major directory (map, authentication, portal)
 - All classes should have a brief docstring  
 - All code files should have a brief comment at the top with usage instructions and role.  
 - Code should broadly aim to follow object-orient design and SOLID principles, where reasonably applicable.  
-### Planning
+## Planning
 Major changes should come with their own plan document, which lives in documentation/map or /portal or /authentication
+## Directories
+README's should always contain a quickstart guide, setup instructions, and directory guides as minimum. 
