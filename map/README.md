@@ -8,6 +8,19 @@
 ...
 ### Frontend
 ...
+## Directory Guide
+| Path | Contents |
+| --- | --- |
+| `backend/` | Flask API (uv project). See [backend/README.md](backend/README.md). |
+| `backend/src/backend/` | App source: app factory and routes |
+| `backend/tests/` | pytest tests |
+| `frontend/` | Angular + Leaflet app. See [frontend/README.md](frontend/README.md). |
+| `frontend/src/app/map/` | The Leaflet map page |
+| `frontend/src/app/services/` | HTTP client for the backend |
+| `frontend/proxy.conf.json` | Dev proxy: `/api/*` → backend on port 5001 |
+
+Planning docs and the changelog live in [`documentation/map/`](../documentation/map/).
+
 ## Usage
 ### Quickstart
 Prerequisites: [Node.js](https://nodejs.org/) 24 (`nvm use` reads the repo's `.nvmrc`) and [uv](https://docs.astral.sh/uv/).
@@ -29,6 +42,13 @@ To run each side on its own:
 | Backend (Flask) | `npm run backend:map` (or `uv run backend` inside `map/backend/`) | http://localhost:5001/api/health |
 
 In dev, the frontend proxies `/api/*` to the backend (`frontend/proxy.conf.json`). The API runs on port 5001 instead of 5000 because macOS AirPlay already uses 5000.
+### Setup
+One-time setup after cloning:
+
+1. Install [Node.js](https://nodejs.org/) 24 (`nvm install && nvm use` in the repo root reads `.nvmrc`) and [uv](https://docs.astral.sh/uv/getting-started/installation/).
+2. From the **repo root**, run `npm install`. This installs every frontend through npm workspaces. Don't run it inside `map/frontend/`.
+3. In `map/backend/`, run `uv sync`. This creates `.venv` with the Python version in `.python-version`. `uv run` also does this automatically on first use.
+
 ### Troubleshooting
 ...
 ### Configuration
