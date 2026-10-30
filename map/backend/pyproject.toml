@@ -19,3 +19,22 @@ backend = "backend:main"
 [build-system]
 requires = ["uv_build>=0.12.1,<0.13.0"]
 build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "ruff>=0.17.3",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py313"
+
+[tool.ruff.lint]
+# pycodestyle (PEP 8), pyflakes, isort, pep8-naming, pydocstyle, pyupgrade, bugbear.
+select = ["E", "W", "F", "I", "N", "D", "UP", "B"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

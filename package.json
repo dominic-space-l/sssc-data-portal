@@ -11,10 +11,20 @@
     "backend:map": "uv --directory map/backend run backend",
     "dev:map": "concurrently -k -n api,web -c blue,green \"npm run backend:map\" \"npm run start:map\"",
     "build": "npm run build --workspaces --if-present",
-    "test": "npm test --workspaces --if-present -- --watch=false"
+    "test": "npm test --workspaces --if-present -- --watch=false",
+    "lint": "eslint map/frontend/src portal/frontend/src",
+    "format": "prettier --write \"{map,portal}/frontend/src/**/*.{ts,html,scss}\"",
+    "format:check": "prettier --check \"{map,portal}/frontend/src/**/*.{ts,html,scss}\"",
+    "lint:backend": "uv --directory map/backend run ruff check && uv --directory map/backend run ruff format --check",
+    "test:backend": "uv --directory map/backend run pytest"
   },
   "devDependencies": {
-    "concurrently": "^10.0.6"
+    "@eslint/js": "^10.0.1",
+    "angular-eslint": "^22.6.0",
+    "concurrently": "^10.0.6",
+    "eslint": "^10.14.0",
+    "prettier": "^3.9.10",
+    "typescript-eslint": "^8.72.1"
   },
   "engines": {
     "node": "^24.15.0 || >=26.0.0"
