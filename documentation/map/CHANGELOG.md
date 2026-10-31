@@ -3,6 +3,23 @@
 Versioning follows `xx.yy.zz` (see [documentation/CLAUDECODE/CLAUDE.md](../CLAUDECODE/CLAUDE.md)):
 `xx` = major feature, `yy` = steps/commits toward a major feature, `zz` = small updates and revisions.
 
+## 0.3.6 — 2026-10-30
+
+Added a GitHub Actions CI workflow (`.github/workflows/ci.yml`) that runs on every pull request and on pushes to `main`:
+- Frontend: ESLint (angular-eslint, `map` selector prefix), a Prettier format check, Vitest tests, and a production build.
+- Backend: Ruff lint (PEP 8 and Google-style docstrings), a Ruff format check, and pytest.
+
+Added the root npm scripts `lint`, `format`, `format:check`, `lint:backend`, and `test:backend`. Prettier reformatted `src/index.html`, with no behavior changes.
+
+**Files changed**
+- `.github/workflows/ci.yml`
+- `eslint.config.js`
+- `package.json`
+- `package-lock.json`
+- `map/backend/pyproject.toml`
+- `map/backend/uv.lock`
+- `map/frontend/src/index.html`
+
 ## 0.3.5 — 2026-10-26
 
 Fixed the placeholder marker popup. It said "Western Washington University" even though the map has been centered on Sitka since 0.3.1, and now says "Sitka, AK".

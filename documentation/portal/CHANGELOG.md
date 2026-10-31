@@ -3,6 +3,18 @@
 Versioning follows `xx.yy.zz` (see [documentation/CLAUDECODE/CLAUDE.md](../CLAUDECODE/CLAUDE.md)):
 `xx` = major feature, `yy` = steps/commits toward a major feature, `zz` = small updates and revisions.
 
+## 0.2.2 — 2026-10-30
+
+Added the portal to the new GitHub Actions CI workflow (`.github/workflows/ci.yml`), which runs ESLint (angular-eslint, `portal` selector prefix), a Prettier format check, Vitest tests, and a production build. Prettier reformatted `app.html` and `index.html`, with no behavior changes.
+
+**Files changed**
+- `.github/workflows/ci.yml`
+- `eslint.config.js`
+- `package.json`
+- `package-lock.json`
+- `portal/frontend/src/app/app.html`
+- `portal/frontend/src/index.html`
+
 ## 0.2.1 — 2026-10-26
 
 Brought the existing portal files in line with the rules in `documentation/CLAUDECODE/CLAUDE.md`:
