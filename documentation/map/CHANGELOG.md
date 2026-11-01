@@ -3,6 +3,54 @@
 Versioning follows `xx.yy.zz` (see [documentation/CLAUDECODE/CLAUDE.md](../CLAUDECODE/CLAUDE.md)):
 `xx` = major feature, `yy` = steps/commits toward a major feature, `zz` = small updates and revisions.
 
+## 0.3.10 — 2026-10-31
+
+Recorded the remaining map decisions in the plans:
+- A station with several roles for one organization is drawn as a pie marker, with one slice per role.
+- Inactive stations are greyed out, using a new generic `muted` feature property and a `muted_label` legend entry.
+- The organization dropdown lists only organizations with a station role.
+- Contact names are never shown to the public.
+- `mask_point` now uses PostGIS `ST_Project` on `geography`, and the masking tests use `ST_Distance`.
+
+Replaced the map plan's open questions with a single Supabase question: which of the two `Stations` coordinate columns is the source of truth.
+
+**Files changed**
+- `documentation/map/map_app_plan.md`
+- `documentation/map/supabase_plan.md`
+- `documentation/map/CHANGELOG.md`
+
+## 0.3.9 — 2026-10-31
+
+Revised both plans after decisions on masking and Supabase:
+- Masking uses the salted deterministic offset, at 250–500 m, applied in Supabase, with no stations exempt. The backend `LocationMasker` and its config are removed from the map plan.
+- The Supabase steps are now commits 1–6 of the map plan (`0.4.0`–`0.9.0`) and are logged in this changelog. The map commits follow, from `0.10.0`, and `1.0.0` is now commit 18.
+- Projects with no stations stay in the project dropdown, tagged "No stations", using a new `hint` on filter options and a per-project `station_count` from `map_filter_options()`. Selecting one shows a message on the map.
+- Each Supabase step adds its own pgTAP tests (the separate test step is gone). `map_stations()` gains a `p_station` parameter for the detail route.
+- `StationContact` keeps `StationID` as its sole key (one contact per station, by design).
+- Resolved the open questions on changelogs, `StationContact`, empty projects, exemptions, Supabase setup, views, and the identity quirk.
+
+**Files changed**
+- `documentation/map/map_app_plan.md`
+- `documentation/map/supabase_plan.md`
+- `documentation/map/CHANGELOG.md`
+
+## 0.3.8 — 2026-10-31
+
+Added a Supabase setup plan for the map, covering CLI migrations in the repo, foreign keys, the linking-table identity fix, indexes, RLS that blocks the anon role from reading any table, the masking secret in Vault, the `map_stations` and `map_filter_options` functions, and pgTAP tests. It lists how each step simplifies the map app plan's commits. The map plan's masking section now points to it.
+
+**Files changed**
+- `documentation/map/supabase_plan.md`
+- `documentation/map/map_app_plan.md`
+- `documentation/map/CHANGELOG.md`
+
+## 0.3.7 — 2026-10-31
+
+Revised the plan with the 1.0 feature set: stations as waypoints at masked locations, popups with name, code, and active status, filters for station type, observation type, and project, and an organization dropdown that colors stations by role, which a project selection also sets. Added a location masking section (options, rules, and a recommendation) and a section on how the filters and colors interact. Split the work into 13 commits, from `0.4.0` to `1.0.0`. Moved the detail panel and layer control to a new "After 1.0" list, and fixed the schema link.
+
+**Files changed**
+- `documentation/map/map_app_plan.md`
+- `documentation/map/CHANGELOG.md`
+
 ## 0.3.6 — 2026-10-30
 
 Added a GitHub Actions CI workflow (`.github/workflows/ci.yml`) that runs on every pull request and on pushes to `main`:
