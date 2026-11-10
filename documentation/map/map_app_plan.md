@@ -274,6 +274,8 @@ The Supabase steps (1–6) and the backend foundation (7–9) don't depend on ea
 
 **2. Foreign keys, identity fix, indexes, and station coordinates — `0.5.0`** (S2)
 
+**2b. `StationSites` coordinates and elevation — `0.5.1`** (S2b): the same generated `geography` column and range checks as `Stations`, and `Elevation` renamed `Elevation (FT)`.
+
 **3. Row-level security for `anon` — `0.6.0`** (S3)
 
 **4. Masking secret and `mask_point` — `0.7.0`** (S4): 250–500 m offset with PostGIS `ST_Project`, secret in Vault.

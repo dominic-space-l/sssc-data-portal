@@ -13,6 +13,7 @@ Supabase step S2: foreign keys, identity fix, indexes, and station coordinates.
 - **Seed:** no longer inserts `CoordinateLocation`, and linking-table inserts no longer use `overriding system value`.
 - **Tests:** new pgTAP tests check the full set of foreign keys and their delete rules, the full set of identity columns, index coverage for every foreign key, and the coordinate column's type, sync, read-only behavior, and range checks.
 - **Docs:** `schema.md` reflects the new coordinate column and the linking tables' ID columns. The plan's S2 section notes what the implementation found.
+- **Plan:** added step S2b (map `0.5.1`) so `StationSites` handles coordinates the same way as `Stations`: the same generated `geography` column and range checks. It also renames `Elevation` to `Elevation (FT)` and drops the unneeded unique rule on its point. The hosted `StationSites` table was empty when this was written.
 
 **Files changed**
 - `supabase/migrations/20261110171451_s2_keys_identity_indexes_coordinates.sql`
@@ -20,6 +21,7 @@ Supabase step S2: foreign keys, identity fix, indexes, and station coordinates.
 - `supabase/seed.sql`
 - `documentation/schema.md`
 - `documentation/map/supabase_plan.md`
+- `documentation/map/map_app_plan.md`
 - `documentation/map/CHANGELOG.md`
 
 ## 0.4.1 — 2026-11-10

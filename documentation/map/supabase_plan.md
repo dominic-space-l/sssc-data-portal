@@ -164,6 +164,63 @@ Also in this step:
 
 **Tests:** `has_fk` / `fk_ok` for each key above, and an insert into `StationOrganizationRole` with a nonexistent `StationID` fails. For coordinates: `col_type_is` reports `geography(Point,4326)` for `Stations.CoordinateLocation`, and `col_is_generated` passes for it. For each seeded station, the point's longitude and latitude equal `Longitude`/`Latitude`. After an update to a station's `Longitude`, its point moves to match. An insert or update that sets `CoordinateLocation` directly raises an error, and so does a `Latitude` of 95.
 
+### S2b. `StationSites` coordinates and elevation — map `0.5.1`
+
+`StationSites` stores a location twice, just as `Stations` did: `Longitude`/`Latitude` (`numeric`, `NOT NULL`) and `CoordinateLocation` (plain `geography`, `NOT NULL UNIQUE`, written separately). The two tables were never meant to differ. This step makes `StationSites` match `Stations` after S2:
+- `Longitude`/`Latitude` are the source of truth, with the same range checks.
+- `CoordinateLocation` becomes a stored generated `geography(Point, 4326)` column that can't be written directly.
+- `Elevation` is renamed `Elevation (FT)`. It's already stored in feet, and the new name matches `Stations`.
+
+**Uniqueness is dropped.** The baseline makes `CoordinateLocation` unique, so two sites can't share a point. Nothing needs that rule, and `Stations` doesn't have it. Dropping the column drops the constraint (`StationSites_CoordinateLocation_key`), and it isn't re-created.
+
+**Hosted data:** when this step was planned (2026-11-10), `StationSites` had no rows and no station had a `SiteID`, so nothing is lost by dropping the column. Re-run this check before migrating in case sites have been added since. For each row it reports the point type, the SRID, and how far the stored point is from `Longitude`/`Latitude`:
+
+```sql
+select "SiteID",
+       extensions.st_geometrytype("CoordinateLocation"::extensions.geometry) as point_type,
+       extensions.st_srid("CoordinateLocation")                              as srid,
+       extensions.st_distance("CoordinateLocation",
+         extensions.st_setsrid(
+           extensions.st_makepoint("Longitude", "Latitude"), 4326)::extensions.geography) as dist_m
+from public."StationSites";
+```
+
+If any row has a different point type or SRID, or a distance over 1 m, fix its `Longitude`/`Latitude` first.
+
+```sql
+alter table public."StationSites"
+  add constraint station_sites_longitude_range check ("Longitude" between -180 and 180),
+  add constraint station_sites_latitude_range  check ("Latitude"  between  -90 and  90);
+
+alter table public."StationSites" rename column "Elevation" to "Elevation (FT)";
+
+alter table public."StationSites" drop column "CoordinateLocation";  -- also drops StationSites_CoordinateLocation_key
+
+alter table public."StationSites"
+  add column "CoordinateLocation" extensions.geography(Point, 4326)
+  generated always as (
+    extensions.st_setsrid(
+      extensions.st_makepoint("Longitude"::float8, "Latitude"::float8), 4326
+    )::extensions.geography
+  ) stored;
+
+comment on column public."StationSites"."CoordinateLocation" is
+  'Generated from Longitude/Latitude (WGS 84). Read-only: edit Longitude and Latitude instead.';
+```
+
+**Also in this step:**
+- **Seed:** `supabase/seed.sql` has no sites yet. Add two sites near Sitka, with an `Elevation (FT)` on one. Put stations 1 and 2 at site 1 (a site with more than one station) and leave site 2 empty. Advance the `SiteID` sequence past them.
+- **Docs:** update the `StationSites` rows in [schema.md](../schema.md). `CoordinateLocation` becomes `geography(Point, 4326)`, generated and read-only, and is no longer unique. `Elevation` becomes `Elevation (FT)`.
+
+**Tests** (`supabase/tests/02_station_sites_coordinates.test.sql`), mirroring S2's coordinate tests:
+- `CoordinateLocation` is a stored generated `geography(Point, 4326)`, and every seeded site's point matches its `Longitude`/`Latitude`.
+- Updating `Longitude` moves the point.
+- Writing `CoordinateLocation` directly in an insert or update raises `428C9`.
+- An out-of-range latitude or longitude raises `23514`.
+- A site inserted with only `Longitude`/`Latitude` succeeds.
+- `has_column` passes for `Elevation (FT)` and `hasnt_column` passes for `Elevation`.
+- **Parity:** the shared columns (`Longitude`, `Latitude`, `CoordinateLocation`, `Elevation (FT)`) have the same type, nullability, and generation expression in both tables, and both tables have the same range checks. A later change to one table that isn't made to the other fails this test.
+
 ### S3. Row-level security for `anon` — map `0.6.0`
 
 Turn on RLS for **every** table in `public`, and remove the anon role's table privileges. With RLS on and no anon policies, anon reads return nothing. Revoking the grants as well means anon requests fail loudly rather than silently returning empty results.
@@ -410,7 +467,7 @@ Catches the hosted database drifting from the repo: a table or policy edited in 
 
 ## Order of work
 
-S1 → S2 → S3 → S4 → S5 → S6, with S7 anywhere after S3 and before map commit 10. The map backend doesn't call Supabase until map commit 10, so there's no window during these steps where the live map is broken or exposed. S7 should land before the live map relies on the access rules, so the drift check is guarding them from day one. Until S7 lands, push by hand with `supabase db push` as described in each step.
+S1 → S2 → S2b → S3 → S4 → S5 → S6, with S7 anywhere after S3 and before map commit 10. The map backend doesn't call Supabase until map commit 10, so there's no window during these steps where the live map is broken or exposed. S7 should land before the live map relies on the access rules, so the drift check is guarding them from day one. Until S7 lands, push by hand with `supabase db push` as described in each step.
 
 Once the map is live, push any migration that changes access (a revoke, a grant, or a function's columns) in the same `supabase db push` as the function changes that go with it.
 
