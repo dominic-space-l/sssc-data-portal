@@ -1,0 +1,109 @@
+# Database CI: build the Supabase schema from scratch, then test and lint it.
+#
+# Role: runs on pull requests and pushes to main that touch supabase/ (or the CLI
+# version in package.json). It starts a throwaway local Postgres in Docker, applies
+# every migration in supabase/migrations/ plus supabase/seed.sql, and then:
+#   - runs the pgTAP tests in supabase/tests/
+#   - lints SQL functions (plpgsql_check) and runs Supabase's security advisors
+#   - on PRs, fails if an already-merged migration was edited, deleted, or renamed,
+#     or if a new migration's timestamp sorts before the newest merged one
+# It never connects to the hosted project and needs no secrets.
+#
+# Usage (local equivalents, from the repo root, with Docker running):
+#   npm run db:start && npm run db:test && npm run db:lint
+
+name: Database
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "supabase/**"
+      - "package.json"
+      - "package-lock.json"
+      - ".github/workflows/database.yml"
+  pull_request:
+    paths:
+      - "supabase/**"
+      - "package.json"
+      - "package-lock.json"
+      - ".github/workflows/database.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: database-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  migrations-immutable:
+    name: Merged migrations are unchanged
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Check supabase/migrations/ against the base branch
+        env:
+          BASE: origin/${{ github.base_ref }}
+        run: |
+          set -euo pipefail
+          changed=$(git diff --name-only --diff-filter=MDR "$BASE...HEAD" -- supabase/migrations/)
+          if [ -n "$changed" ]; then
+            echo "::error::Migrations already on ${{ github.base_ref }} were modified, deleted, or renamed:"
+            echo "$changed"
+            echo "Write a new migration instead (npx supabase migration new <name>)."
+            exit 1
+          fi
+
+          latest_merged=$(git ls-tree --name-only "$BASE" supabase/migrations/ | xargs -r -n1 basename | sort | tail -n1)
+          added=$(git diff --name-only --diff-filter=A "$BASE...HEAD" -- supabase/migrations/ | xargs -r -n1 basename | sort)
+          for f in $added; do
+            if [[ -n "$latest_merged" && "$f" < "$latest_merged" ]]; then
+              echo "::error::$f sorts before $latest_merged, the newest merged migration. Rename it with a newer timestamp."
+              exit 1
+            fi
+          done
+          echo "OK: no merged migrations changed; new migrations sort after $latest_merged."
+
+  test:
+    name: Migrations, pgTAP tests, lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Use pinned npm version
+        run: npm install -g npm@11.19.0
+
+      # Installs the Supabase CLI at the version pinned in package-lock.json.
+      - name: Install dependencies
+        run: npm ci
+
+      # Starts only Postgres (not Auth, Storage, Studio, ...), then applies every
+      # migration and seed.sql. A migration that fails to apply fails this step.
+      - name: Start local database
+        run: npx supabase db start
+
+      - name: Test (pgTAP)
+        run: npx supabase test db
+
+      # Only our schemas: extensions (PostGIS etc.) has known plpgsql_check errors that
+      # aren't ours to fix. Add map_private here once S4 creates it.
+      - name: Lint SQL functions
+        run: npx supabase db lint --schema public --level warning --fail-on error
+
+      - name: Security advisors
+        run: npx supabase db advisors --type security --fail-on error
+
+      - name: Stop local database
+        if: always()
+        run: npx supabase stop --no-backup

@@ -3,6 +3,32 @@
 Versioning follows `xx.yy.zz` (see [documentation/CLAUDECODE/CLAUDE.md](../CLAUDECODE/CLAUDE.md)):
 `xx` = major feature, `yy` = steps/commits toward a major feature, `zz` = small updates and revisions.
 
+## 0.4.0 — 2026-11-09
+
+Supabase step S1: CLI and baseline.
+- Added the Supabase CLI as a root devDependency (`supabase@^3.1.0`, run with `npx supabase` or the new `db:start`, `db:stop`, `db:reset`, and `db:test` scripts) and ran `supabase init` at the repo root.
+- Linked the hosted project and pulled the current schema, unchanged, as the baseline migration.
+- Added `supabase/seed.sql`, a small fictional dataset with known IDs and coordinates (including a project with no stations, an organization with no roles, and an organization with two roles at one station), and a baseline pgTAP test that checks the tables, PostGIS, and the seed.
+- Added `supabase/README.md` and the `supabase/` entry in the root README. The root README now lists Docker as a prerequisite for the local database and explains how to make Node 24 the nvm default.
+- Regenerated `package-lock.json` with Node 24 and npm 11.
+- Added a `Database` GitHub Actions workflow (`.github/workflows/database.yml`) that, for changes under `supabase/`, builds the database from the migrations and seed, runs the pgTAP tests, lints SQL functions, and runs the Supabase security advisors. On PRs, it also fails if a merged migration was edited, deleted, or renamed, or if a new migration sorts before the newest merged one. Added the `db:lint` script to match. Lint covers only the `public` schema, because PostGIS's functions in `extensions` report plpgsql_check errors that aren't ours.
+- Added step S7 to the Supabase plan for a later commit: a deploy workflow (`supabase db push` after CI passes on `main`, with a dry-run summary and a required approval) and a nightly read-only drift check (migration history, schema diff, and security advisors against the hosted project).
+
+**Files changed**
+- `.github/workflows/database.yml`
+- `documentation/map/supabase_plan.md`
+- `documentation/map/map_app_plan.md`
+- `package.json`
+- `package-lock.json`
+- `README.md`
+- `supabase/config.toml`
+- `supabase/.gitignore`
+- `supabase/migrations/20261110000334_remote_schema.sql`
+- `supabase/seed.sql`
+- `supabase/tests/00_baseline.test.sql`
+- `supabase/README.md`
+- `documentation/map/CHANGELOG.md`
+
 ## 0.3.10 — 2026-10-31
 
 Recorded the remaining map decisions in the plans:
