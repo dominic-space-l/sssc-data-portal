@@ -57,6 +57,11 @@ Each step is one commit, with one migration (or a small group of them) and its p
 
 ### S2. Foreign keys, identity fix, indexes, and station coordinates — map `0.5.0`
 
+> **Done (0.5.0).** Migration `20261110171451_s2_keys_identity_indexes_coordinates.sql`, tests in `supabase/tests/01_keys_identity_coordinates.test.sql`. What the implementation found:
+> - Every foreign key below already existed, so there were no orphan rows. But 7 of them used `on delete cascade` from a lookup table, which doesn't match the table below. For example, deleting a measurement unit deleted every sensor placement that used it. Those 7 were re-created with the plan's rule. The three `restrict` keys from the baseline (`Contacts`, `OrganizationProjects`, `DeviceSpecifications`) use Postgres's default `no action`, which blocks the same deletes, so they were left as is.
+> - Indexes cover every foreign key that isn't the leading column of a primary key (16 in all), not only the five listed. `sor_organization_idx` was skipped because it duplicates the primary key.
+> - On the hosted project, `CoordinateLocation` was NULL for all 5 stations, so the drift check found nothing to keep.
+
 **Check for orphan rows first.** Adding a foreign key fails if any row points at a missing parent. For each pair below, run a query like this and fix the data before migrating:
 
 ```sql

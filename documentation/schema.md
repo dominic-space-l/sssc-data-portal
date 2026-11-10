@@ -136,9 +136,9 @@ The "primary" table of this schema. Holds core information regarded the environm
 | `IsSeasonal` | `bool` |  Nullable |
 | `UpdateInterval` | `text` |  Nullable |
 | `TransmitTime` | `text` |  Nullable |
-| `CoordinateLocation` | `geometry` |  Nullable |
-| `Longitude` | `numeric` |  |
-| `Latitude` | `numeric` |  |
+| `CoordinateLocation` | `geography(Point, 4326)` | Generated from `Longitude`/`Latitude`, read-only |
+| `Longitude` | `numeric` | -180 to 180 |
+| `Latitude` | `numeric` | -90 to 90 |
 | `Elevation (FT)` | `int8` |  Nullable |
 | `StationNotes` | `text` |  Nullable |
 
@@ -164,7 +164,7 @@ Linking table that assigns each station a Contact person. This relationship is t
 
 | Name | Type | Constraints |
 |------|------|-------------|
-| `StationID` | `int8` | Primary Identity |
+| `StationID` | `int8` | Primary |
 | `ContactID` | `int8` |  |
 | `RoleID` | `int8` |  Nullable |
 
@@ -177,7 +177,7 @@ Linking table relating Organizations to their Roles for Stations.
 | Name | Type | Constraints |
 |------|------|-------------|
 | `OrganizationID` | `int8` | Primary |
-| `StationID` | `int8` | Primary Identity |
+| `StationID` | `int8` | Primary |
 | `RoleID` | `int8` | Primary |
 
 ## Table `StationsToSpecs`
@@ -188,7 +188,7 @@ Linking table relating Stations to their DeviceSpecifications.
 
 | Name | Type | Constraints |
 |------|------|-------------|
-| `StationID` | `int8` | Primary Identity |
+| `StationID` | `int8` | Primary |
 | `DeviceSpecificationID` | `int8` | Primary |
 | `SerialNumber` | `text` |  Nullable |
 
@@ -200,7 +200,7 @@ Linking table relating Sensors to their DeviceSpecifications.
 
 | Name | Type | Constraints |
 |------|------|-------------|
-| `SensorID` | `int8` | Primary Identity |
+| `SensorID` | `int8` | Primary |
 | `DeviceSpecificationID` | `int8` | Primary |
 | `SerialNumber` | `text` |  Nullable |
 
@@ -212,8 +212,8 @@ Linking table between Stations and Sensors. Contains placement information, meas
 
 | Name | Type | Constraints |
 |------|------|-------------|
-| `StationID` | `int8` | Primary Identity |
-| `SensorID` | `int8` | Primary Identity |
+| `StationID` | `int8` | Primary |
+| `SensorID` | `int8` | Primary |
 | `PlacementHeight (Meters)` | `float4` |  Nullable |
 | `PlacementNotes` | `text` |  Nullable |
 | `Count` | `int2` |  Nullable |
@@ -238,7 +238,7 @@ Linking table relating Stations to ObservationTypes. Some redundancy with Statio
 
 | Name | Type | Constraints |
 |------|------|-------------|
-| `StationID` | `int8` | Primary Identity |
+| `StationID` | `int8` | Primary |
 | `ObservationTypeID` | `int8` | Primary |
 | `Quality` | `OBSERVATION_QUALITY_FLAG` |  Nullable |
 

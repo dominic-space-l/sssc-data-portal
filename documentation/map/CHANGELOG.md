@@ -3,6 +3,25 @@
 Versioning follows `xx.yy.zz` (see [documentation/CLAUDECODE/CLAUDE.md](../CLAUDECODE/CLAUDE.md)):
 `xx` = major feature, `yy` = steps/commits toward a major feature, `zz` = small updates and revisions.
 
+## 0.5.0 — 2026-11-10
+
+Supabase step S2: foreign keys, identity fix, indexes, and station coordinates.
+- **Delete rules:** every planned foreign key already existed. Seven cascaded deletes from lookup tables (roles, observation types, measurement units, device specifications) into the rows that used them. They now `restrict` or `set null`, as in the plan.
+- **Identity fix:** the identity was dropped from the copied ID columns in the six linking tables (`StationID`, plus `SensorID` in `StationsToSensors` and `SensorsToSpecs`).
+- **Indexes:** every foreign key not already covered by a primary key now has an index (16 in all).
+- **Station coordinates:** `Stations.CoordinateLocation` is now a stored generated `geography(Point, 4326)` column built from `Longitude`/`Latitude`, so it can't drift and can't be written directly. `Longitude` and `Latitude` have range checks. On the hosted project, all 5 stations had a NULL `CoordinateLocation`, so dropping and re-adding the column lost nothing.
+- **Seed:** no longer inserts `CoordinateLocation`, and linking-table inserts no longer use `overriding system value`.
+- **Tests:** new pgTAP tests check the full set of foreign keys and their delete rules, the full set of identity columns, index coverage for every foreign key, and the coordinate column's type, sync, read-only behavior, and range checks.
+- **Docs:** `schema.md` reflects the new coordinate column and the linking tables' ID columns. The plan's S2 section notes what the implementation found.
+
+**Files changed**
+- `supabase/migrations/20261110171451_s2_keys_identity_indexes_coordinates.sql`
+- `supabase/tests/01_keys_identity_coordinates.test.sql`
+- `supabase/seed.sql`
+- `documentation/schema.md`
+- `documentation/map/supabase_plan.md`
+- `documentation/map/CHANGELOG.md`
+
 ## 0.4.1 — 2026-11-10
 
 Settled the Supabase plan's open question about station coordinates and added the fix to S2. `Longitude`/`Latitude` are the source of truth. `Stations.CoordinateLocation` becomes a stored generated `geography(Point, 4326)` column built from them, so the two can't drift apart and it now matches `StationSites`. S2 also adds longitude and latitude range checks, a query to find drifted rows before migrating, a seed update, and tests. `Elevation (FT)` stays a separate column.
