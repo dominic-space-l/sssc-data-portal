@@ -272,7 +272,7 @@ The Supabase steps (1–6) and the backend foundation (7–9) don't depend on ea
 
 **1. Supabase CLI and baseline — `0.4.0`** (S1): `supabase/` in the repo, the current schema pulled as the first migration, and the pgTAP test folder.
 
-**2. Foreign keys, identity fix, and indexes — `0.5.0`** (S2)
+**2. Foreign keys, identity fix, indexes, and station coordinates — `0.5.0`** (S2)
 
 **3. Row-level security for `anon` — `0.6.0`** (S3)
 
@@ -382,4 +382,4 @@ Each of these becomes its own `1.x` commit, and only touches the files listed.
 
 ## Open questions
 
-None for the map app. See [supabase_plan.md](supabase_plan.md#open-questions) for one about the coordinate columns.
+None.

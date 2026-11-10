@@ -55,7 +55,7 @@ Each step is one commit, with one migration (or a small group of them) and its p
 - Add `supabase/README.md` (quickstart, setup, directory guide) and the `supabase/` entry to the root README's directory guide.
 - Don't commit `.env` files or database passwords. `supabase/.temp/` goes in `.gitignore`.
 
-### S2. Foreign keys, identity fix, and indexes — map `0.5.0`
+### S2. Foreign keys, identity fix, indexes, and station coordinates — map `0.5.0`
 
 **Check for orphan rows first.** Adding a foreign key fails if any row points at a missing parent. For each pair below, run a query like this and fix the data before migrating:
 
@@ -108,7 +108,56 @@ create index if not exists station_obs_type_idx      on public."StationObservati
 
 Drop any that duplicate the leading column of an existing primary key.
 
-**Tests:** `has_fk` / `fk_ok` for each key above, and an insert into `StationOrganizationRole` with a nonexistent `StationID` fails.
+**Station coordinates.** `Stations` stores a location twice: `Longitude`/`Latitude` (`numeric`, what users type in the data portal) and `CoordinateLocation` (a PostGIS point for spatial queries). The two are kept because the client wanted plain numbers to enter and read, and the developer wanted a spatial type. They must never disagree. `CoordinateLocation` is also `geometry` here but `geography` in `StationSites`.
+
+`Longitude`/`Latitude` are the source of truth. `CoordinateLocation` becomes a **stored generated column** of type `geography(Point, 4326)`, computed from them:
+
+- Postgres recomputes it on every insert and update, so it can't drift. There's no trigger code to maintain.
+- Nobody can write it directly. An insert or update that sets it raises an error, which matches the portal, where users only enter longitude and latitude.
+- It matches `StationSites.CoordinateLocation`, and `mask_point` (S4) already works on `geography`.
+
+A trigger would only be needed if both sides could be edited, for example a GIS tool writing the point. Nothing does, so the generated column is the simpler choice. `Elevation (FT)` stays a separate column and isn't folded into the point as a Z value. Geography distance and `ST_Project` ignore Z, elevation is optional, and it's stored in feet.
+
+Postgres can't turn an existing column into a generated one, so the migration drops and re-adds it. **Before migrating**, check the hosted data for rows where the stored point disagrees with `Longitude`/`Latitude`, has the wrong SRID, or is missing. Dropping the column discards those values, so decide which side is right for each row and fix `Longitude`/`Latitude` first:
+
+```sql
+select "StationID", "Longitude", "Latitude",
+       extensions.st_astext("CoordinateLocation") as stored_point,
+       extensions.st_srid("CoordinateLocation")   as srid
+from public."Stations"
+where "CoordinateLocation" is null
+   or extensions.st_srid("CoordinateLocation") <> 4326
+   or extensions.st_distance(
+        "CoordinateLocation"::extensions.geography,
+        extensions.st_setsrid(
+          extensions.st_makepoint("Longitude", "Latitude"), 4326)::extensions.geography
+      ) > 1;  -- metres
+```
+
+Then migrate:
+
+```sql
+alter table public."Stations"
+  add constraint stations_longitude_range check ("Longitude" between -180 and 180),
+  add constraint stations_latitude_range  check ("Latitude"  between  -90 and  90);
+
+alter table public."Stations" drop column "CoordinateLocation";
+alter table public."Stations"
+  add column "CoordinateLocation" extensions.geography(Point, 4326)
+  generated always as (
+    extensions.st_setsrid(
+      extensions.st_makepoint("Longitude"::float8, "Latitude"::float8), 4326
+    )::extensions.geography
+  ) stored;
+```
+
+The range checks catch typos and most swapped values (a Sitka longitude of about −135 fails the latitude check). Without them, PostGIS would quietly wrap an out-of-range point instead of raising an error. If the drift query finds anything out of range, fix it before adding the constraints.
+
+Also in this step:
+- Remove `CoordinateLocation` from the `Stations` insert in `supabase/seed.sql`. Inserting into a generated column fails.
+- Update the `Stations` row in [schema.md](../schema.md): `CoordinateLocation` becomes `geography`, generated from `Longitude`/`Latitude`.
+
+**Tests:** `has_fk` / `fk_ok` for each key above, and an insert into `StationOrganizationRole` with a nonexistent `StationID` fails. For coordinates: `col_type_is` reports `geography(Point,4326)` for `Stations.CoordinateLocation`, and `col_is_generated` passes for it. For each seeded station, the point's longitude and latitude equal `Longitude`/`Latitude`. After an update to a station's `Longitude`, its point moves to match. An insert or update that sets `CoordinateLocation` directly raises an error, and so does a `Latitude` of 95.
 
 ### S3. Row-level security for `anon` — map `0.6.0`
 
@@ -364,4 +413,4 @@ The map's backend foundation (map commits 7–9) doesn't depend on any of this a
 
 ## Open questions
 
-1. **Which coordinates are the source of truth?** `Stations` stores a location twice: `Longitude`/`Latitude` (`numeric`) and `CoordinateLocation` (`geometry`). `map_stations()` masks `Longitude`/`Latitude`. If the two can drift apart (for example, one is edited in the dashboard and the other isn't), S2 could make `CoordinateLocation` a generated column built from them, or add a trigger that keeps them in sync. Note also that `Stations.CoordinateLocation` is `geometry` while `StationSites.CoordinateLocation` is `geography`. That's harmless for the map, but worth making consistent.
+None. The question about which coordinate column is the source of truth is settled in [S2](#s2-foreign-keys-identity-fix-indexes-and-station-coordinates--map-050): `Longitude`/`Latitude` are, and `CoordinateLocation` becomes a `geography` column generated from them.

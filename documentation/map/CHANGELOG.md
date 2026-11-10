@@ -3,6 +3,15 @@
 Versioning follows `xx.yy.zz` (see [documentation/CLAUDECODE/CLAUDE.md](../CLAUDECODE/CLAUDE.md)):
 `xx` = major feature, `yy` = steps/commits toward a major feature, `zz` = small updates and revisions.
 
+## 0.4.1 — 2026-11-10
+
+Settled the Supabase plan's open question about station coordinates and added the fix to S2. `Longitude`/`Latitude` are the source of truth. `Stations.CoordinateLocation` becomes a stored generated `geography(Point, 4326)` column built from them, so the two can't drift apart and it now matches `StationSites`. S2 also adds longitude and latitude range checks, a query to find drifted rows before migrating, a seed update, and tests. `Elevation (FT)` stays a separate column.
+
+**Files changed**
+- `documentation/map/supabase_plan.md`
+- `documentation/map/map_app_plan.md`
+- `documentation/map/CHANGELOG.md`
+
 ## 0.4.0 — 2026-11-09
 
 Supabase step S1: CLI and baseline.
