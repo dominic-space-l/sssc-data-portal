@@ -19,6 +19,8 @@
 --                  3 Project Empty (org 3): no stations
 --   Stations       1-3 in projects; 4 has no project; 3 is inactive
 --   Roles          org 1 holds two roles at station 1 (multi-role / pie marker case)
+--   Sites          1 Test Site 1: stations 1, 2
+--                  2 Test Site 2: no stations
 
 -- Explicit IDs keep the tests deterministic. `overriding system value` is needed for
 -- the identity primary keys. Linking tables have no identity columns, so their inserts
@@ -55,18 +57,25 @@ overriding system value values
   (2, 'Water level'),
   (3, 'Precipitation');
 
--- CoordinateLocation is generated from Longitude/Latitude, so it isn't inserted.
+-- CoordinateLocation is generated from Longitude/Latitude in both StationSites and
+-- Stations, so it isn't inserted.
+insert into public."StationSites"
+  ("SiteID", "SiteName", "Longitude", "Latitude", "Elevation (FT)", "SiteNotes")
+overriding system value values
+  (1, 'Test Site 1', -135.3350, 57.0450, 120,  'Seed note: shared by stations 1 and 2'),
+  (2, 'Test Site 2', -135.2500, 57.0900, null, null);
+
 insert into public."Stations"
-  ("StationID", "ProjectID", "StationTypeID", "StationName", "StationCode",
+  ("StationID", "ProjectID", "SiteID", "StationTypeID", "StationName", "StationCode",
    "IsActive", "Longitude", "Latitude", "StationNotes")
 overriding system value
-select id, project, station_type, name, code, active, lon, lat, notes
+select id, project, site, station_type, name, code, active, lon, lat, notes
 from (values
-  (1::bigint, 1::bigint, 1::bigint, 'Test Station 1', 'TS1', true,  -135.3300::numeric, 57.0500::numeric, 'Seed note: gate code 1234'),
-  (2,         1,         2,         'Test Station 2', 'TS2', true,  -135.3400,          57.0400,          null),
-  (3,         2,         1,         'Test Station 3', 'TS3', false, -135.2900,          57.0700,          null),
-  (4,         null,      2,         'Test Station 4', null,  true,  -135.4000,          57.0200,          null)
-) as v(id, project, station_type, name, code, active, lon, lat, notes);
+  (1::bigint, 1::bigint, 1::bigint, 1::bigint, 'Test Station 1', 'TS1', true,  -135.3300::numeric, 57.0500::numeric, 'Seed note: gate code 1234'),
+  (2,         1,         1,         2,         'Test Station 2', 'TS2', true,  -135.3400,          57.0400,          null),
+  (3,         2,         null,      1,         'Test Station 3', 'TS3', false, -135.2900,          57.0700,          null),
+  (4,         null,      null,      2,         'Test Station 4', null,  true,  -135.4000,          57.0200,          null)
+) as v(id, project, site, station_type, name, code, active, lon, lat, notes);
 
 insert into public."StationOrganizationRole" ("OrganizationID", "StationID", "RoleID") values
   (1, 1, 1),
@@ -89,4 +98,5 @@ select setval(pg_get_serial_sequence('public."Organizations"', 'OrganizationID')
 select setval(pg_get_serial_sequence('public."OrganizationProjects"', 'ProjectID'), 3);
 select setval(pg_get_serial_sequence('public."StationTypes"', 'TypeID'), 2);
 select setval(pg_get_serial_sequence('public."ObservationTypes"', 'ObservationTypeID'), 3);
+select setval(pg_get_serial_sequence('public."StationSites"', 'SiteID'), 2);
 select setval(pg_get_serial_sequence('public."Stations"', 'StationID'), 4);

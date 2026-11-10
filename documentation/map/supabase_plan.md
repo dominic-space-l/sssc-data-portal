@@ -166,6 +166,8 @@ Also in this step:
 
 ### S2b. `StationSites` coordinates and elevation — map `0.5.1`
 
+> **Done (0.5.1).** Migration `20261110172633_s2b_station_sites_coordinates.sql`, tests in `supabase/tests/02_station_sites_coordinates.test.sql`. The hosted `StationSites` table was still empty when the migration was written.
+
 `StationSites` stores a location twice, just as `Stations` did: `Longitude`/`Latitude` (`numeric`, `NOT NULL`) and `CoordinateLocation` (plain `geography`, `NOT NULL UNIQUE`, written separately). The two tables were never meant to differ. This step makes `StationSites` match `Stations` after S2:
 - `Longitude`/`Latitude` are the source of truth, with the same range checks.
 - `CoordinateLocation` becomes a stored generated `geography(Point, 4326)` column that can't be written directly.

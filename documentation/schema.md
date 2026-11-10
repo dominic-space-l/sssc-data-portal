@@ -65,10 +65,10 @@ Geographic locations where Stations are placed. May contain more than one Statio
 |------|------|-------------|
 | `SiteID` | `int8` | Primary Identity |
 | `SiteName` | `text` |  Nullable |
-| `CoordinateLocation` | `geography` |  Unique |
-| `Longitude` | `numeric` |  |
-| `Latitude` | `numeric` |  |
-| `Elevation` | `int8` |  Nullable |
+| `CoordinateLocation` | `geography(Point, 4326)` | Generated from `Longitude`/`Latitude`, read-only |
+| `Longitude` | `numeric` | -180 to 180 |
+| `Latitude` | `numeric` | -90 to 90 |
+| `Elevation (FT)` | `int8` |  Nullable |
 | `SiteNotes` | `text` |  Nullable |
 
 ## Table `OrganizationProjects`

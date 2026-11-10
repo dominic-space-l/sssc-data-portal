@@ -3,6 +3,25 @@
 Versioning follows `xx.yy.zz` (see [documentation/CLAUDECODE/CLAUDE.md](../CLAUDECODE/CLAUDE.md)):
 `xx` = major feature, `yy` = steps/commits toward a major feature, `zz` = small updates and revisions.
 
+## 0.5.1 — 2026-11-10
+
+Supabase step S2b: `StationSites` now handles location the same way as `Stations`. The difference between them was never intended.
+- **Coordinates:** `StationSites.CoordinateLocation` is now a stored generated `geography(Point, 4326)` column built from `Longitude`/`Latitude`, and it can't be written directly. `Longitude` and `Latitude` have the same range checks as in `Stations`.
+- **Uniqueness:** the old unique rule on the point was dropped with the column and not re-created, so two sites may now share a point.
+- **Elevation:** `Elevation` is renamed `Elevation (FT)` to match `Stations`. It was already stored in feet.
+- **Hosted data:** the hosted `StationSites` table was empty, so dropping the column lost nothing.
+- **Seed:** added two sites. Stations 1 and 2 share site 1, and site 2 has no stations.
+- **Tests:** new pgTAP tests check the new columns and their behavior. They also check that the location columns and range checks of `StationSites` and `Stations` match exactly, so a change to one table that isn't made to the other fails CI.
+- **Docs:** updated `schema.md`, and marked S2b done in the plan.
+
+**Files changed**
+- `supabase/migrations/20261110172633_s2b_station_sites_coordinates.sql`
+- `supabase/tests/02_station_sites_coordinates.test.sql`
+- `supabase/seed.sql`
+- `documentation/schema.md`
+- `documentation/map/supabase_plan.md`
+- `documentation/map/CHANGELOG.md`
+
 ## 0.5.0 — 2026-11-10
 
 Supabase step S2: foreign keys, identity fix, indexes, and station coordinates.
