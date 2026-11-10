@@ -10,7 +10,7 @@ This plan moves privacy and query logic into the database. Once it's in place, t
 
 ### Scope
 
-- **In scope:** migrations in the repo, foreign keys and indexes, RLS for the `anon` role, the masking secret in Vault, the two map functions, and pgTAP tests for each.
+- **In scope:** migrations in the repo, foreign keys and indexes, RLS for the `anon` role, the masking secret in Vault, the two map functions, pgTAP tests for each, and GitHub Actions workflows to test, deploy, and drift-check the database.
 - **Out of scope:** policies for the `authenticated` role (the portal and `authentication/` plans own writes and logged-in access) and data cleanup beyond what foreign keys require.
 
 ## Target design
@@ -301,9 +301,62 @@ comment on function public.map_filter_options() is
 
 **Tests:** as `anon`, the function succeeds. Every project is listed, including the seeded one with no stations, which has `station_count = 0`. Each project carries its `organization_id`. Only organizations with at least one role are listed. No key contains a notes field.
 
+### S7. Deploy and drift-check workflows — map: next free `yy` when it lands
+
+S1 added `.github/workflows/database.yml`, which tests migrations against a throwaway local database and never touches the hosted project. This step adds two workflows that do connect to it. Both use the same setup:
+
+- **Secrets live in GitHub environments, not repository secrets.** An environment's secrets reach only jobs that name that environment, and an environment can require approval before a job starts.
+  - `supabase-production`, with **Required reviewers** set to Nicholas and deployments limited to the `main` branch. Secrets: `SUPABASE_ACCESS_TOKEN` (a personal access token from **Account → Access Tokens**) and `SUPABASE_DB_PASSWORD`. Variable: `SUPABASE_PROJECT_ID` (`cmxvpikgbetmesmpiubt`).
+  - `supabase-readonly`, with no reviewers, for the nightly check. It holds the same `SUPABASE_ACCESS_TOKEN` and `SUPABASE_PROJECT_ID`, and a database URL for a read-only role (below) instead of the owner password.
+- **Read-only role for the drift check.** Create it by hand in the SQL editor, like the Vault secret in S4, so the password never lands in a migration:
+  ```sql
+  create role ci_readonly login password '<generated>' in role pg_read_all_data;
+  ```
+  Store `postgresql://ci_readonly.<project-ref>:<password>@<pooler-host>:5432/postgres` as `SUPABASE_READONLY_DB_URL` in `supabase-readonly`. If `supabase db diff` can't dump the schema as this role, fall back to the owner password in that environment and note it here.
+- **The CLI version comes from `package-lock.json`** (`npm ci`, then `npx supabase`), the same as in `database.yml`, so all three workflows run the same CLI.
+
+#### Deploy: `.github/workflows/database-deploy.yml`
+
+```
+push to main ──▶ Database (CI) ──success──▶ plan: link + db push --dry-run
+                                                 │  (log shows pending migrations)
+                                                 ▼
+                                   deploy: waits for approval in supabase-production
+                                                 │
+                                                 ▼
+                                   db push ──▶ migration list (confirm) ──▶ db advisors --remote
+```
+
+- **Trigger:** `workflow_run` on the `Database` workflow, `types: [completed]`, `branches: [main]`, with `if: github.event.workflow_run.conclusion == 'success'`. Deploys therefore happen only after the migrations, tests, lint, and advisors pass on `main`. Check out `github.event.workflow_run.head_sha`, so it deploys the commit that was tested. Also allow `workflow_dispatch` for a manual re-run.
+- **`plan` job** (environment `supabase-readonly`, no approval needed): `npx supabase link --project-ref "$SUPABASE_PROJECT_ID"`, then `npx supabase db push --dry-run`. It writes the list of pending migrations to the job summary (`$GITHUB_STEP_SUMMARY`), so the reviewer sees exactly what will run before approving. If nothing is pending, it says so and `deploy` is skipped.
+- **`deploy` job** (`needs: plan`, environment `supabase-production`, which pauses for approval): `link`, then `npx supabase db push --yes`. Hosted changes accept only `--yes` or `SUPABASE_YES` for confirmation. Then `npx supabase migration list --linked` confirms local and remote match, and `npx supabase db advisors --remote --type security --fail-on error` confirms nothing regressed.
+- **`concurrency: { group: database-deploy, cancel-in-progress: false }`**, so two deploys never overlap and a queued one isn't cancelled halfway.
+- **Never** pass `--include-seed` (the seed is fictional test data) or `--include-all` (it applies migrations older than the remote's latest, which the `migrations-immutable` check exists to prevent).
+- **Out of the deploy's reach:** the Vault secret (S4) and the read-only role stay manual one-time steps, and data changes aren't migrations.
+- **Rollback is forward-only.** Fix a bad migration with a new migration through the same path. For data loss, use the hosted project's backups (**Database → Backups**). Write the restore steps into `supabase/README.md` when this step lands.
+
+Once this workflow exists, stop running `supabase db push` from a laptop. Update the "Workflow for a schema change" section in `supabase/README.md` to say that merging to `main` and approving the deploy is the only path to the hosted database.
+
+#### Drift check: `.github/workflows/database-drift.yml`
+
+Catches the hosted database drifting from the repo: a table or policy edited in the dashboard, a migration pushed but never merged, or one merged but never deployed. That matters most after S3. A dashboard edit that loosens a grant or a policy would otherwise go unnoticed.
+
+- **Trigger:** `schedule` nightly (for example `cron: "17 10 * * *"`, around 2–3 a.m. Alaska time) and `workflow_dispatch`. It runs in environment `supabase-readonly`.
+- **Checks, each failing the job:**
+  1. **Migration history:** `npx supabase migration list --linked`. Fail if any migration is only local (merged but not deployed) or only remote (pushed but not in the repo).
+  2. **Schema:** `npx supabase db diff --from migrations --to "$SUPABASE_READONLY_DB_URL" --schema public,map_private` (drop `map_private` if S4 hasn't landed). It builds the migrations in a shadow database on the runner and compares it with the hosted schema. Fail if the output contains any SQL. Check the CLI's exit code and output format when implementing, and fail on non-empty output rather than relying on the exit code.
+  3. **Security advisors:** `npx supabase db advisors --remote --type security --fail-on error`. This catches, for example, a table created in the dashboard without RLS.
+- **Output:** write the diff and the advisor findings to the job summary. GitHub emails the person who last changed the workflow's schedule when a scheduled run fails, so nobody has to watch it.
+- **Fixing drift:** if the dashboard change was intended, capture it with `npx supabase db pull` as a new migration in a PR. If not, write a migration that reverts it. Either way, the repo stays the source of truth.
+
+**Tests / verification** (workflows can't be pgTAP-tested, so verify by hand when the step lands):
+- Run `database-drift.yml` with `workflow_dispatch` on a clean state. All three checks pass.
+- Merge a no-op migration (for example a `comment on table`). `plan` lists it, `deploy` waits for approval, and after approval `migration list` shows it on both sides.
+- Run `plan` with nothing pending. It reports that and skips `deploy`.
+
 ## Order of work
 
-S1 → S2 → S3 → S4 → S5 → S6. The map backend doesn't call Supabase until map commit 10, so there's no window during these steps where the live map is broken or exposed.
+S1 → S2 → S3 → S4 → S5 → S6, with S7 anywhere after S3 and before map commit 10. The map backend doesn't call Supabase until map commit 10, so there's no window during these steps where the live map is broken or exposed. S7 should land before the live map relies on the access rules, so the drift check is guarding them from day one. Until S7 lands, push by hand with `supabase db push` as described in each step.
 
 Once the map is live, push any migration that changes access (a revoke, a grant, or a function's columns) in the same `supabase db push` as the function changes that go with it.
 

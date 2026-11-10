@@ -284,6 +284,8 @@ The Supabase steps (1–6) and the backend foundation (7–9) don't depend on ea
 
 Each step adds its own pgTAP tests.
 
+**S7. Deploy and drift-check workflows — next free `yy`:** a gated `supabase db push` on merge to `main`, plus a nightly read-only drift check against the hosted project. It can land any time after S3 and must land before commit 10.
+
 ### Backend foundation
 
 **7. Config and dependencies — `0.10.0`**

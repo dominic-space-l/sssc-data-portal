@@ -1,0 +1,64 @@
+# Supabase
+
+The database for the whole project. This folder holds the Supabase CLI project: the local stack config, the versioned schema migrations, local seed data, and pgTAP tests. The hosted Supabase project is the source of truth for data. This folder is the source of truth for **schema and access rules**.
+
+The plan for this folder is [documentation/map/supabase_plan.md](../documentation/map/supabase_plan.md), and changes are logged in the [map changelog](../documentation/map/CHANGELOG.md).
+
+## Quickstart
+
+Prerequisites: Node.js 24 and Docker running (see the [root README](../README.md#quickstart)). From the **repo root**:
+
+```sh
+npm install          # installs the Supabase CLI locally (no global install needed)
+npm run db:start     # starts local Postgres, API, and Studio in Docker (first run downloads images)
+npm run db:reset     # rebuilds the local DB: every migration, then seed.sql
+npm run db:test      # runs the pgTAP tests in supabase/tests/
+npm run db:lint      # lints SQL functions and runs Supabase's security advisors
+```
+
+Local Studio is at http://localhost:54323, and Postgres is at `postgresql://postgres:postgres@127.0.0.1:54322/postgres`. `npm run db:stop` stops the containers.
+
+Any other CLI command runs through npx, for example `npx supabase status`.
+
+## Setup
+
+One-time setup to work against the hosted project:
+
+1. Install Docker. On Windows/WSL, use Docker Desktop with **Settings → Resources → WSL integration** turned on for your distro, then check that `docker ps` works in your WSL terminal.
+2. `npx supabase login` opens a browser to create an access token.
+3. `npx supabase link --project-ref <project-ref>`. The ref is in the dashboard URL (`supabase.com/dashboard/project/<project-ref>`). It asks for the database password. Don't put the password in any file in the repo.
+4. Check that `major_version` under `[db]` in `config.toml` matches the hosted Postgres version (**Settings → Infrastructure** in the dashboard). `supabase link` warns if they differ.
+
+`supabase/.temp/` (link state) and `.env*` files are git-ignored. Never commit database passwords or access tokens.
+
+## Workflow for a schema change
+
+1. Write a new migration: `npx supabase migration new <short_name>`, then edit the file it creates in `migrations/`. You can also make the change in local Studio and generate the file with `npx supabase db diff -f <short_name>`.
+2. Add or update pgTAP tests in `tests/`.
+3. `npm run db:reset && npm run db:test && npm run db:lint`. All three must pass.
+4. Commit the migration and its tests together, and open a PR. CI runs the same checks (see below).
+5. After the PR merges, `npx supabase db push` applies the new migrations to the hosted project. Run `npx supabase db push --dry-run` first to see what it will apply.
+
+Never edit a migration that has already been merged or pushed. Write a new one instead. Make schema changes through migrations, not in the hosted dashboard. A change made in the dashboard isn't in the repo, so local and CI databases won't have it. If one slips through, capture it with `npx supabase db pull` as a new migration.
+
+## Continuous integration
+
+[`.github/workflows/database.yml`](../.github/workflows/database.yml) runs on every PR and push to `main` that touches `supabase/`, `package.json`, or `package-lock.json`. It needs no secrets and never touches the hosted project.
+
+| Check | What it catches |
+| --- | --- |
+| `supabase db start` | A migration or `seed.sql` that doesn't apply cleanly to an empty database |
+| `supabase test db` | Failing pgTAP tests |
+| `supabase db lint --schema public --fail-on error` | Type and reference errors inside our SQL and plpgsql functions. `extensions` is skipped because PostGIS's own functions report errors there. Add each new schema we own (for example `map_private` in S4) to `--schema` in the workflow and the `db:lint` script. |
+| `supabase db advisors --type security --fail-on error` | Error-level security issues, such as a public table without RLS |
+| Merged migrations unchanged (PRs only) | Editing, deleting, or renaming a migration already on `main`, or adding one whose timestamp sorts before the newest merged one |
+
+## Directory guide
+
+| Path | Contents |
+| --- | --- |
+| `config.toml` | Local stack config from `supabase init` (ports, Postgres version, seed path) |
+| `migrations/` | Versioned schema migrations, applied in timestamp order. The first is the baseline pulled from the hosted project with `supabase db pull`. |
+| `seed.sql` | Small, fictional dataset loaded by `supabase db reset`. Local only, never pushed. The tests depend on its IDs and coordinates. |
+| `tests/` | pgTAP tests, run by `supabase test db`. Each file runs in a transaction and rolls back. |
+| `.temp/` | CLI link state (git-ignored) |
