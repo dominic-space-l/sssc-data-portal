@@ -100,3 +100,9 @@ select setval(pg_get_serial_sequence('public."StationTypes"', 'TypeID'), 2);
 select setval(pg_get_serial_sequence('public."ObservationTypes"', 'ObservationTypeID'), 3);
 select setval(pg_get_serial_sequence('public."StationSites"', 'SiteID'), 2);
 select setval(pg_get_serial_sequence('public."Stations"', 'StationID'), 4);
+
+-- Location-masking secret for map_private.mask_point (S4), so masking works locally.
+-- This value is public and throwaway. The hosted project has its own secret, created by
+-- hand in the SQL editor; never copy this one there. The tests replace or delete it
+-- inside their own transactions when they need to.
+select vault.create_secret('local-dev-only-not-a-real-secret', 'map_location_mask_secret');

@@ -249,6 +249,13 @@ alter default privileges in schema public revoke all on sequences from anon;
 
 ### S4. Masking secret and `mask_point` — map `0.7.0`
 
+> **Done (0.7.0).** Migration `20261112062156_s4_mask_point.sql`, tests in `supabase/tests/04_mask_point.test.sql`. The function is the one below, unchanged. What the implementation found:
+> - **The hosted secret is still a manual step.** Run the `vault.create_secret` call below before S5's `map_stations` is used. Until then, `mask_point` raises instead of returning a point. The step is also listed under "Hosted project: one-time manual steps" in `supabase/README.md`.
+> - **Local secret in the seed.** The plan had each test insert a secret inside its transaction. Instead, `supabase/seed.sql` creates a throwaway local `map_location_mask_secret`, so masking works in local development and in S5's tests without extra setup. The tests delete or replace it inside their own transactions when they need to. `supabase db push` never sends the seed.
+> - pgcrypto, Vault (0.3.1), and PostGIS are already installed by Supabase in `extensions` and `vault`, so the `extensions.` prefixes work as written.
+> - `map_private` is now linted in CI and in `npm run db:lint`.
+> - With the local secret, the four seeded stations move 271–349 m, in four different directions. Over the local API, `rpc/mask_point` returns 404 and the `map_private` profile is rejected (406).
+
 Store the secret in Vault once, by hand in the SQL editor, **not in a migration**:
 
 ```sql
@@ -312,7 +319,13 @@ comment on function map_private.mask_point(bigint, numeric, numeric) is
 - The radius is in the function body, not a parameter, so a caller can't ask for a smaller one. To change it later, edit the two constants in a new migration. Every marker will move.
 - Rounding to 4 decimal places (about 11 m) can push a point a few meters outside the 250–500 m band. The tests allow ±15 m for that.
 
-**Tests:** with a test secret inserted in the transaction, the same input always returns the same point. For each seeded station, the distance from its true point is between 235 and 515 m, measured with `extensions.st_distance` on `geography`. The output never equals the input. With the secret deleted, the function raises `location masking is not configured`. As `anon`, calling it raises a permission error.
+**Tests:** the same input always returns the same point. For each seeded station, the distance from its true point is between 235 and 515 m, measured with `extensions.st_distance` on `geography`. The output never equals the input. With the secret deleted, the function raises `location masking is not configured`. As `anon`, calling it raises a permission error. The implementation also checks that:
+- the function is stable and security definer, with an empty `search_path`
+- `PUBLIC`, `anon`, and `authenticated` have no usage on `map_private` and no execute on `mask_point`, and `authenticated` can't call it either
+- output is rounded to 4 decimal places
+- the seeded stations move in different directions, and two ids at the same point get different results
+- replacing the secret moves every point, and each point stays 235–515 m from its true location
+- a null longitude gives a null point, not an error
 
 ### S5. `map_stations` function — map `0.8.0`
 
