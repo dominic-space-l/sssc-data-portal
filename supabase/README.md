@@ -44,7 +44,13 @@ These hold secrets, so they're done by hand in the dashboard's SQL editor and ne
 2. Add or update pgTAP tests in `tests/`.
 3. `npm run db:reset && npm run db:test && npm run db:lint`. All three must pass.
 4. Commit the migration and its tests together, and open a PR. CI runs the same checks (see below).
-5. After the PR merges, `npx supabase db push` applies the new migrations to the hosted project. Run `npx supabase db push --dry-run` first to see what it will apply.
+5. After the PR merges, check out `main` with a clean working tree, then push the new migrations to the hosted project:
+   ```sh
+   npx supabase db push --remote --dry-run   # lists what will run; check it's only what you expect
+   npx supabase db push --remote --yes
+   npx supabase migration list --remote      # every migration should show on both sides
+   ```
+   **`--remote` is required.** Since CLI 3, `db push`, `migration list`, and similar commands target the *local* Docker database unless you pass `--remote`. Check the `Target:` line at the top of the output: it should name the hosted project, not `local stack`. Without `--remote`, the push goes to your local database, and if that has a migration your checkout doesn't (for example from resetting on another branch), it fails with `Remote migration versions not found in local migrations directory`. That message means your local database, not the hosted one, so don't run the `migration repair` it suggests. Re-run with `--remote`, or run `npm run db:reset` to bring the local database back in line with your checkout.
 
 Never edit a migration that has already been merged or pushed. Write a new one instead. Make schema changes through migrations, not in the hosted dashboard. A change made in the dashboard isn't in the repo, so local and CI databases won't have it. If one slips through, capture it with `npx supabase db pull` as a new migration.
 

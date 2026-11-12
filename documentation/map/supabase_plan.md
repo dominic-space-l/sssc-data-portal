@@ -45,7 +45,7 @@ This plan moves privacy and query logic into the database. Once it's in place, t
 
 ## Steps
 
-Each step is one commit, with one migration (or a small group of them) and its pgTAP tests. Before pushing each one to the hosted project with `supabase db push`, run `supabase db reset` and `supabase test db` locally.
+Each step is one commit, with one migration (or a small group of them) and its pgTAP tests. Before pushing each one to the hosted project with `supabase db push --remote`, run `supabase db reset` and `supabase test db` locally.
 
 ### S1. Supabase CLI and baseline — map `0.4.0`
 
@@ -445,23 +445,24 @@ S1 added `.github/workflows/database.yml`, which tests migrations against a thro
   create role ci_readonly login password '<generated>' in role pg_read_all_data;
   ```
   Store `postgresql://ci_readonly.<project-ref>:<password>@<pooler-host>:5432/postgres` as `SUPABASE_READONLY_DB_URL` in `supabase-readonly`. If `supabase db diff` can't dump the schema as this role, fall back to the owner password in that environment and note it here.
+- **Every command that should reach the hosted project passes `--remote`.** Since CLI 3, `db push`, `migration list`, and `db advisors` target the local database by default, so without the flag a command points at a database on the runner instead of the hosted project. Each job should also fail unless the CLI's JSON output reports `"target": {"kind": "linked", ...}`.
 - **The CLI version comes from `package-lock.json`** (`npm ci`, then `npx supabase`), the same as in `database.yml`, so all three workflows run the same CLI.
 
 #### Deploy: `.github/workflows/database-deploy.yml`
 
 ```
-push to main ──▶ Database (CI) ──success──▶ plan: link + db push --dry-run
+push to main ──▶ Database (CI) ──success──▶ plan: link + db push --remote --dry-run
                                                  │  (log shows pending migrations)
                                                  ▼
                                    deploy: waits for approval in supabase-production
                                                  │
                                                  ▼
-                                   db push ──▶ migration list (confirm) ──▶ db advisors --remote
+                                   db push --remote ──▶ migration list --remote ──▶ db advisors --remote
 ```
 
 - **Trigger:** `workflow_run` on the `Database` workflow, `types: [completed]`, `branches: [main]`, with `if: github.event.workflow_run.conclusion == 'success'`. Deploys therefore happen only after the migrations, tests, lint, and advisors pass on `main`. Check out `github.event.workflow_run.head_sha`, so it deploys the commit that was tested. Also allow `workflow_dispatch` for a manual re-run.
-- **`plan` job** (environment `supabase-readonly`, no approval needed): `npx supabase link --project-ref "$SUPABASE_PROJECT_ID"`, then `npx supabase db push --dry-run`. It writes the list of pending migrations to the job summary (`$GITHUB_STEP_SUMMARY`), so the reviewer sees exactly what will run before approving. If nothing is pending, it says so and `deploy` is skipped.
-- **`deploy` job** (`needs: plan`, environment `supabase-production`, which pauses for approval): `link`, then `npx supabase db push --yes`. Hosted changes accept only `--yes` or `SUPABASE_YES` for confirmation. Then `npx supabase migration list --linked` confirms local and remote match, and `npx supabase db advisors --remote --type security --fail-on error` confirms nothing regressed.
+- **`plan` job** (environment `supabase-readonly`, no approval needed): `npx supabase link --project-ref "$SUPABASE_PROJECT_ID"`, then `npx supabase db push --remote --dry-run`. It writes the list of pending migrations to the job summary (`$GITHUB_STEP_SUMMARY`), so the reviewer sees exactly what will run before approving. If nothing is pending, it says so and `deploy` is skipped.
+- **`deploy` job** (`needs: plan`, environment `supabase-production`, which pauses for approval): `link`, then `npx supabase db push --remote --yes`. Hosted changes accept only `--yes` or `SUPABASE_YES` for confirmation. Then `npx supabase migration list --remote` confirms local and remote match, and `npx supabase db advisors --remote --type security --fail-on error` confirms nothing regressed.
 - **`concurrency: { group: database-deploy, cancel-in-progress: false }`**, so two deploys never overlap and a queued one isn't cancelled halfway.
 - **Never** pass `--include-seed` (the seed is fictional test data) or `--include-all` (it applies migrations older than the remote's latest, which the `migrations-immutable` check exists to prevent).
 - **Out of the deploy's reach:** the Vault secret (S4) and the read-only role stay manual one-time steps, and data changes aren't migrations.
@@ -475,7 +476,7 @@ Catches the hosted database drifting from the repo: a table or policy edited in 
 
 - **Trigger:** `schedule` nightly (for example `cron: "17 10 * * *"`, around 2–3 a.m. Alaska time) and `workflow_dispatch`. It runs in environment `supabase-readonly`.
 - **Checks, each failing the job:**
-  1. **Migration history:** `npx supabase migration list --linked`. Fail if any migration is only local (merged but not deployed) or only remote (pushed but not in the repo).
+  1. **Migration history:** `npx supabase migration list --remote`. Fail if any migration is only local (merged but not deployed) or only remote (pushed but not in the repo).
   2. **Schema:** `npx supabase db diff --from migrations --to "$SUPABASE_READONLY_DB_URL" --schema public,map_private` (drop `map_private` if S4 hasn't landed). It builds the migrations in a shadow database on the runner and compares it with the hosted schema. Fail if the output contains any SQL. Check the CLI's exit code and output format when implementing, and fail on non-empty output rather than relying on the exit code.
   3. **Security advisors:** `npx supabase db advisors --remote --type security --fail-on error`. This catches, for example, a table created in the dashboard without RLS.
 - **Output:** write the diff and the advisor findings to the job summary. GitHub emails the person who last changed the workflow's schedule when a scheduled run fails, so nobody has to watch it.
@@ -488,9 +489,9 @@ Catches the hosted database drifting from the repo: a table or policy edited in 
 
 ## Order of work
 
-S1 → S2 → S2b → S3 → S4 → S5 → S6, with S7 anywhere after S3 and before map commit 10. The map backend doesn't call Supabase until map commit 10, so there's no window during these steps where the live map is broken or exposed. S7 should land before the live map relies on the access rules, so the drift check is guarding them from day one. Until S7 lands, push by hand with `supabase db push` as described in each step.
+S1 → S2 → S2b → S3 → S4 → S5 → S6, with S7 anywhere after S3 and before map commit 10. The map backend doesn't call Supabase until map commit 10, so there's no window during these steps where the live map is broken or exposed. S7 should land before the live map relies on the access rules, so the drift check is guarding them from day one. Until S7 lands, push by hand with `supabase db push --remote` as described in each step and in the "Workflow for a schema change" section of `supabase/README.md`.
 
-Once the map is live, push any migration that changes access (a revoke, a grant, or a function's columns) in the same `supabase db push` as the function changes that go with it.
+Once the map is live, push any migration that changes access (a revoke, a grant, or a function's columns) in the same `supabase db push --remote` as the function changes that go with it.
 
 The map's backend foundation (map commits 7–9) doesn't depend on any of this and can proceed in parallel.
 
