@@ -97,9 +97,9 @@ jobs:
         run: npx supabase test db
 
       # Only our schemas: extensions (PostGIS etc.) has known plpgsql_check errors that
-      # aren't ours to fix. Add map_private here once S4 creates it.
+      # aren't ours to fix. Add each new schema we own here and in the db:lint script.
       - name: Lint SQL functions
-        run: npx supabase db lint --schema public --level warning --fail-on error
+        run: npx supabase db lint --schema public,map_private --level warning --fail-on error
 
       - name: Security advisors
         run: npx supabase db advisors --type security --fail-on error

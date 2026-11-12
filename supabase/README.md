@@ -29,6 +29,13 @@ One-time setup to work against the hosted project:
 3. `npx supabase link --project-ref <project-ref>`. The ref is in the dashboard URL (`supabase.com/dashboard/project/<project-ref>`). It asks for the database password. Don't put the password in any file in the repo.
 4. Check that `major_version` under `[db]` in `config.toml` matches the hosted Postgres version (**Settings → Infrastructure** in the dashboard). `supabase link` warns if they differ.
 
+### Hosted project: one-time manual steps
+
+These hold secrets, so they're done by hand in the dashboard's SQL editor and never go in a migration:
+
+- **Location-masking secret** (before S5's `map_stations` is used): `select vault.create_secret('<value>', 'map_location_mask_secret');`, with the value from `openssl rand -base64 48`. Don't keep a copy anywhere else. Changing it later moves every marker on the public map. Until it exists, `map_private.mask_point` raises `location masking is not configured`. Check that it exists with `select name, created_at from vault.secrets;`. Locally, `seed.sql` creates a throwaway one.
+- **Exposed schemas:** **Settings → API → Exposed schemas** must not include `map_private`.
+
 `supabase/.temp/` (link state) and `.env*` files are git-ignored. Never commit database passwords or access tokens.
 
 ## Workflow for a schema change
@@ -63,7 +70,7 @@ The anon key is public, so the anon role gets no access to tables (since map `0.
 | --- | --- |
 | `supabase db start` | A migration or `seed.sql` that doesn't apply cleanly to an empty database |
 | `supabase test db` | Failing pgTAP tests |
-| `supabase db lint --schema public --fail-on error` | Type and reference errors inside our SQL and plpgsql functions. `extensions` is skipped because PostGIS's own functions report errors there. Add each new schema we own (for example `map_private` in S4) to `--schema` in the workflow and the `db:lint` script. |
+| `supabase db lint --schema public,map_private --fail-on error` | Type and reference errors inside our SQL and plpgsql functions. `extensions` is skipped because PostGIS's own functions report errors there. Add each new schema we own to `--schema` in the workflow and the `db:lint` script. |
 | `supabase db advisors --type security --fail-on error` | Error-level security issues, such as a public table without RLS |
 | Merged migrations unchanged (PRs only) | Editing, deleting, or renaming a migration already on `main`, or adding one whose timestamp sorts before the newest merged one |
 
@@ -73,6 +80,6 @@ The anon key is public, so the anon role gets no access to tables (since map `0.
 | --- | --- |
 | `config.toml` | Local stack config from `supabase init` (ports, Postgres version, seed path) |
 | `migrations/` | Versioned schema migrations, applied in timestamp order. The first is the baseline pulled from the hosted project with `supabase db pull`. |
-| `seed.sql` | Small, fictional dataset loaded by `supabase db reset`. Local only, never pushed. The tests depend on its IDs and coordinates. |
+| `seed.sql` | Small, fictional dataset loaded by `supabase db reset`. Local only, never pushed. The tests depend on its IDs and coordinates. It also creates a throwaway local `map_location_mask_secret` in Vault. |
 | `tests/` | pgTAP tests, run by `supabase test db`. Each file runs in a transaction and rolls back. |
 | `.temp/` | CLI link state (git-ignored) |

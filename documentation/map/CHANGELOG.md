@@ -3,6 +3,25 @@
 Versioning follows `xx.yy.zz` (see [documentation/CLAUDECODE/CLAUDE.md](../CLAUDECODE/CLAUDE.md)):
 `xx` = major feature, `yy` = steps/commits toward a major feature, `zz` = small updates and revisions.
 
+## 0.7.0 — 2026-11-11
+
+Supabase step S4: the masking secret and `map_private.mask_point`.
+- **Masking:** `mask_point(id, lon, lat)` moves a point 250–500 m in a direction picked by `HMAC(secret, id)`, using PostGIS `ST_Project`, and rounds the result to 4 decimal places. The same id always gives the same point, so the offset can't be averaged away. The radius is fixed in the function, so no caller can ask for a smaller one.
+- **Secret:** it's read from Supabase Vault (`map_location_mask_secret`) and never appears in the repo or a migration. On the hosted project it's created once by hand, and that still needs doing. Without it, `mask_point` raises `location masking is not configured`. The local seed creates a throwaway secret.
+- **Lockdown:** the function lives in the new `map_private` schema, which isn't exposed through the API. Usage and execute are revoked from `PUBLIC`, `anon`, and `authenticated`. Only S5's `map_stations` will call it.
+- **Tests:** new pgTAP tests check the function's definition and privileges. They check that every seeded station moves 235–515 m and never stays put, that output is deterministic, that the secret and the id both change the offset, and that a missing secret raises. They also check that anon and authenticated can't call it.
+- **CI:** `map_private` is now linted in the `Database` workflow and `npm run db:lint`.
+- **Docs:** marked S4 done in the plan. `supabase/README.md` lists the hosted one-time manual steps (the secret and the exposed-schemas check).
+
+**Files changed**
+- `supabase/migrations/20261112062156_s4_mask_point.sql`
+- `supabase/tests/04_mask_point.test.sql`
+- `supabase/seed.sql`
+- `supabase/README.md`
+- `.github/workflows/database.yml`
+- `package.json`
+- `documentation/map/supabase_plan.md`
+- `documentation/map/map_app_plan.md`
 ## 0.6.1 — 2026-11-12
 
 Fixed the hosted push commands in the docs. Since Supabase CLI 3, `db push` and `migration list` target the local Docker database unless given `--remote`. The documented `npx supabase db push` therefore went to the local database, and the push of S3 failed with a misleading `Remote migration versions not found` error. The hosted project wasn't touched.
