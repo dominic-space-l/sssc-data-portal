@@ -3,6 +3,18 @@
 Versioning follows `xx.yy.zz` (see [documentation/CLAUDECODE/CLAUDE.md](../CLAUDECODE/CLAUDE.md)):
 `xx` = major feature, `yy` = steps/commits toward a major feature, `zz` = small updates and revisions.
 
+## 0.6.1 — 2026-11-12
+
+Fixed the hosted push commands in the docs. Since Supabase CLI 3, `db push` and `migration list` target the local Docker database unless given `--remote`. The documented `npx supabase db push` therefore went to the local database, and the push of S3 failed with a misleading `Remote migration versions not found` error. The hosted project wasn't touched.
+- `supabase/README.md`: the "Workflow for a schema change" push step now uses `db push --remote --dry-run`, `db push --remote --yes`, and `migration list --remote`. It says how to check the `Target:` line, and what the misleading error means: don't run the `migration repair` the CLI suggests.
+- `supabase_plan.md`: every hosted push in the steps and in S7 uses `--remote`, and `migration list --linked` (deprecated) is now `--remote`. S7 notes that each job should fail unless the CLI reports the hosted project as its target.
+- Migration header comments still say `npx supabase db push`, because merged migrations aren't edited.
+
+**Files changed**
+- `supabase/README.md`
+- `documentation/map/supabase_plan.md`
+- `documentation/map/CHANGELOG.md`
+
 ## 0.6.0 — 2026-11-11
 
 Supabase step S3: row-level security for `anon`. The anon key is public, so the anon role can no longer touch any table.
