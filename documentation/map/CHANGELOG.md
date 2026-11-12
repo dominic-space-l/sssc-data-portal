@@ -3,6 +3,23 @@
 Versioning follows `xx.yy.zz` (see [documentation/CLAUDECODE/CLAUDE.md](../CLAUDECODE/CLAUDE.md)):
 `xx` = major feature, `yy` = steps/commits toward a major feature, `zz` = small updates and revisions.
 
+## 0.6.0 — 2026-11-11
+
+Supabase step S3: row-level security for `anon`. The anon key is public, so the anon role can no longer touch any table.
+- **Grants:** anon's privileges on every table and sequence in `public` are revoked, and so are `postgres`'s default privileges that gave anon access to new tables and sequences. An anon request for a table now fails with `permission denied` (HTTP 401) instead of returning `[]`.
+- **RLS:** all 18 tables already had RLS on and no policies in the baseline, so anon reads already returned nothing and nothing could have relied on them. The migration still enables RLS on each table, to state the rule in one place.
+- **Unchanged:** `authenticated` keeps its grants and is still blocked by RLS until the portal adds policies. anon keeps `USAGE` on schema `public`, which RPC calls need.
+- **Tests:** new pgTAP tests read the catalog, so tables and functions added later are covered too. They check that every table has RLS on, anon has no table, column, or sequence privilege, new tables get no anon grant, no policy applies to anon or `PUBLIC`, and anon can execute no function in `public` outside an allowlist (empty until S5 and S6). As anon, selecting from every table, inserting a station, and using a sequence each raise a permission error.
+- **Docs:** marked S3 done in the plan, with what the implementation found. S5 and S6 now say to add their function to the allowlist. Added an "Access rules for the anon role" section to `supabase/README.md`.
+
+**Files changed**
+- `supabase/migrations/20261112061116_s3_anon_rls.sql`
+- `supabase/tests/03_anon_rls.test.sql`
+- `supabase/README.md`
+- `documentation/map/supabase_plan.md`
+- `documentation/map/map_app_plan.md`
+- `documentation/map/CHANGELOG.md`
+
 ## 0.5.1 — 2026-11-10
 
 Supabase step S2b: `StationSites` now handles location the same way as `Stations`. The difference between them was never intended.

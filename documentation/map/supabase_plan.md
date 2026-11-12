@@ -225,6 +225,12 @@ comment on column public."StationSites"."CoordinateLocation" is
 
 ### S3. Row-level security for `anon` — map `0.6.0`
 
+> **Done (0.6.0).** Migration `20261112061116_s3_anon_rls.sql`, tests in `supabase/tests/03_anon_rls.test.sql`. What the implementation found:
+> - The baseline already had RLS on for all 18 tables, with no policies. So anon reads already returned no rows and anon writes already failed, and nothing could have relied on anon access. The `enable row level security` lines are no-ops kept to state the rule in one place. The real change is the revokes: anon had every table privilege and `USAGE`/`SELECT`/`UPDATE` on every sequence. Over the API, an anon request for a table now returns `401` with `permission denied` instead of `[]`.
+> - The default-privilege revokes use `for role postgres`, the role migrations and the SQL editor run as. Supabase's `supabase_admin` role has the same anon defaults, and `postgres` can't change them. Nothing of ours is created as `supabase_admin`.
+> - Functions aren't covered by default privileges. New functions in `public` are executable by anon both directly and through `PUBLIC`, and a schema-scoped revoke can't remove the `PUBLIC` grant. Instead, the test fails if anon can execute any function in `public` outside an allowlist. The allowlist is empty now. S5 and S6 add their function to it.
+> - `authenticated` keeps its grants and is still blocked by RLS, as before.
+
 Turn on RLS for **every** table in `public`, and remove the anon role's table privileges. With RLS on and no anon policies, anon reads return nothing. Revoking the grants as well means anon requests fail loudly rather than silently returning empty results.
 
 ```sql
@@ -239,7 +245,7 @@ alter default privileges in schema public revoke all on sequences from anon;
 
 > **Watch out:** enabling RLS also blocks the `authenticated` role until it has policies. Nothing in the repo uses Supabase yet, but check whether anything outside the repo relies on it. The table editor in the dashboard uses the `postgres` role and isn't affected.
 
-**Tests:** as `anon` (`set local role anon`), selecting from every table in `public` raises a permission error. A query on `pg_tables` checks that every table in `public` has `rowsecurity = true`, so a table added later without RLS fails the test.
+**Tests:** as `anon` (`set local role anon`), selecting from every table in `public` raises a permission error. A query on `pg_tables` checks that every table in `public` has `rowsecurity = true`, so a table added later without RLS fails the test. The implementation also checks, from the catalog: anon has no table, column, or sequence privilege in `public`; `postgres`'s default privileges grant anon nothing, and a table created during the test isn't anon-readable; no policy applies to `anon` or `PUBLIC`; anon can execute no function in `public` outside the allowlist; and anon keeps `USAGE` on schema `public`, which RPC calls need.
 
 ### S4. Masking secret and `mask_point` — map `0.7.0`
 
@@ -362,7 +368,7 @@ comment on function public.map_stations(bigint, bigint, bigint[], bigint[], bigi
 - `null` means "no filter" for the array parameters. An empty array would match nothing, so the backend sends `null` when no options are ticked.
 - Functions in `public` are executable by `PUBLIC` by default in Postgres. The `revoke ... from public` line is what limits it to `anon`. Add `authenticated` to the grant if the portal will want the map view too.
 
-**Tests:** as `anon`, the function succeeds and returns only the seven listed columns. No returned `lon`/`lat` equals a seeded station's true value to 4 decimal places. One test per row of the interaction table (neither, organization only, project, project plus a different organization, a project with no stations). The station-type and observation-type arrays filter correctly, and `null` means no filter. `p_station` returns exactly one row. With the secret deleted, the call raises.
+**Tests:** add `map_stations` to the `anon_functions` allowlist in `supabase/tests/03_anon_rls.test.sql`. As `anon`, the function succeeds and returns only the seven listed columns. No returned `lon`/`lat` equals a seeded station's true value to 4 decimal places. One test per row of the interaction table (neither, organization only, project, project plus a different organization, a project with no stations). The station-type and observation-type arrays filter correctly, and `null` means no filter. `p_station` returns exactly one row. With the secret deleted, the call raises.
 
 ### S6. `map_filter_options` function — map `0.9.0`
 
@@ -412,7 +418,7 @@ comment on function public.map_filter_options() is
 
 `OrganizationNotes`, `ProjectNotes`, and `RoleNotes` are left out on purpose. Notes fields tend to collect internal details.
 
-**Tests:** as `anon`, the function succeeds. Every project is listed, including the seeded one with no stations, which has `station_count = 0`. Each project carries its `organization_id`. Only organizations with at least one role are listed. No key contains a notes field.
+**Tests:** add `map_filter_options` to the `anon_functions` allowlist in `supabase/tests/03_anon_rls.test.sql`. As `anon`, the function succeeds. Every project is listed, including the seeded one with no stations, which has `station_count = 0`. Each project carries its `organization_id`. Only organizations with at least one role are listed. No key contains a notes field.
 
 ### S7. Deploy and drift-check workflows — map: next free `yy` when it lands
 

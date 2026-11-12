@@ -41,6 +41,14 @@ One-time setup to work against the hosted project:
 
 Never edit a migration that has already been merged or pushed. Write a new one instead. Make schema changes through migrations, not in the hosted dashboard. A change made in the dashboard isn't in the repo, so local and CI databases won't have it. If one slips through, capture it with `npx supabase db pull` as a new migration.
 
+## Access rules for the anon role
+
+The anon key is public, so the anon role gets no access to tables (since map `0.6.0`, step S3 of the [Supabase plan](../documentation/map/supabase_plan.md)). Every table in `public` has RLS on, and anon has no table or sequence privileges. It reaches data only through functions on an allowlist. `tests/03_anon_rls.test.sql` checks all of this from the catalog, so it fails if:
+
+- a new table doesn't have RLS on: add `alter table ... enable row level security` to its migration
+- a policy applies to `anon` or `PUBLIC` (a policy with no `to` clause applies to `PUBLIC`): name a role, such as `to authenticated`
+- anon can execute a new function in `public`: add `revoke all on function ... from public, anon` to its migration, or, if the public map should call it, add it to `anon_functions` in the test
+
 ## Continuous integration
 
 [`.github/workflows/database.yml`](../.github/workflows/database.yml) runs on every PR and push to `main` that touches `supabase/`, `package.json`, or `package-lock.json`. It needs no secrets and never touches the hosted project.
