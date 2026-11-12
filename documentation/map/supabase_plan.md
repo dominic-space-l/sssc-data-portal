@@ -55,7 +55,12 @@ Each step is one commit, with one migration (or a small group of them) and its p
 - Add `supabase/README.md` (quickstart, setup, directory guide) and the `supabase/` entry to the root README's directory guide.
 - Don't commit `.env` files or database passwords. `supabase/.temp/` goes in `.gitignore`.
 
-### S2. Foreign keys, identity fix, and indexes — map `0.5.0`
+### S2. Foreign keys, identity fix, indexes, and station coordinates — map `0.5.0`
+
+> **Done (0.5.0).** Migration `20261110171451_s2_keys_identity_indexes_coordinates.sql`, tests in `supabase/tests/01_keys_identity_coordinates.test.sql`. What the implementation found:
+> - Every foreign key below already existed, so there were no orphan rows. But 7 of them used `on delete cascade` from a lookup table, which doesn't match the table below. For example, deleting a measurement unit deleted every sensor placement that used it. Those 7 were re-created with the plan's rule. The three `restrict` keys from the baseline (`Contacts`, `OrganizationProjects`, `DeviceSpecifications`) use Postgres's default `no action`, which blocks the same deletes, so they were left as is.
+> - Indexes cover every foreign key that isn't the leading column of a primary key (16 in all), not only the five listed. `sor_organization_idx` was skipped because it duplicates the primary key.
+> - On the hosted project, `CoordinateLocation` was NULL for all 5 stations, so the drift check found nothing to keep.
 
 **Check for orphan rows first.** Adding a foreign key fails if any row points at a missing parent. For each pair below, run a query like this and fix the data before migrating:
 
@@ -108,7 +113,115 @@ create index if not exists station_obs_type_idx      on public."StationObservati
 
 Drop any that duplicate the leading column of an existing primary key.
 
-**Tests:** `has_fk` / `fk_ok` for each key above, and an insert into `StationOrganizationRole` with a nonexistent `StationID` fails.
+**Station coordinates.** `Stations` stores a location twice: `Longitude`/`Latitude` (`numeric`, what users type in the data portal) and `CoordinateLocation` (a PostGIS point for spatial queries). The two are kept because the client wanted plain numbers to enter and read, and the developer wanted a spatial type. They must never disagree. `CoordinateLocation` is also `geometry` here but `geography` in `StationSites`.
+
+`Longitude`/`Latitude` are the source of truth. `CoordinateLocation` becomes a **stored generated column** of type `geography(Point, 4326)`, computed from them:
+
+- Postgres recomputes it on every insert and update, so it can't drift. There's no trigger code to maintain.
+- Nobody can write it directly. An insert or update that sets it raises an error, which matches the portal, where users only enter longitude and latitude.
+- It matches `StationSites.CoordinateLocation`, and `mask_point` (S4) already works on `geography`.
+
+A trigger would only be needed if both sides could be edited, for example a GIS tool writing the point. Nothing does, so the generated column is the simpler choice. `Elevation (FT)` stays a separate column and isn't folded into the point as a Z value. Geography distance and `ST_Project` ignore Z, elevation is optional, and it's stored in feet.
+
+Postgres can't turn an existing column into a generated one, so the migration drops and re-adds it. **Before migrating**, check the hosted data for rows where the stored point disagrees with `Longitude`/`Latitude`, has the wrong SRID, or is missing. Dropping the column discards those values, so decide which side is right for each row and fix `Longitude`/`Latitude` first:
+
+```sql
+select "StationID", "Longitude", "Latitude",
+       extensions.st_astext("CoordinateLocation") as stored_point,
+       extensions.st_srid("CoordinateLocation")   as srid
+from public."Stations"
+where "CoordinateLocation" is null
+   or extensions.st_srid("CoordinateLocation") <> 4326
+   or extensions.st_distance(
+        "CoordinateLocation"::extensions.geography,
+        extensions.st_setsrid(
+          extensions.st_makepoint("Longitude", "Latitude"), 4326)::extensions.geography
+      ) > 1;  -- metres
+```
+
+Then migrate:
+
+```sql
+alter table public."Stations"
+  add constraint stations_longitude_range check ("Longitude" between -180 and 180),
+  add constraint stations_latitude_range  check ("Latitude"  between  -90 and  90);
+
+alter table public."Stations" drop column "CoordinateLocation";
+alter table public."Stations"
+  add column "CoordinateLocation" extensions.geography(Point, 4326)
+  generated always as (
+    extensions.st_setsrid(
+      extensions.st_makepoint("Longitude"::float8, "Latitude"::float8), 4326
+    )::extensions.geography
+  ) stored;
+```
+
+The range checks catch typos and most swapped values (a Sitka longitude of about −135 fails the latitude check). Without them, PostGIS would quietly wrap an out-of-range point instead of raising an error. If the drift query finds anything out of range, fix it before adding the constraints.
+
+Also in this step:
+- Remove `CoordinateLocation` from the `Stations` insert in `supabase/seed.sql`. Inserting into a generated column fails.
+- Update the `Stations` row in [schema.md](../schema.md): `CoordinateLocation` becomes `geography`, generated from `Longitude`/`Latitude`.
+
+**Tests:** `has_fk` / `fk_ok` for each key above, and an insert into `StationOrganizationRole` with a nonexistent `StationID` fails. For coordinates: `col_type_is` reports `geography(Point,4326)` for `Stations.CoordinateLocation`, and `col_is_generated` passes for it. For each seeded station, the point's longitude and latitude equal `Longitude`/`Latitude`. After an update to a station's `Longitude`, its point moves to match. An insert or update that sets `CoordinateLocation` directly raises an error, and so does a `Latitude` of 95.
+
+### S2b. `StationSites` coordinates and elevation — map `0.5.1`
+
+> **Done (0.5.1).** Migration `20261110172633_s2b_station_sites_coordinates.sql`, tests in `supabase/tests/02_station_sites_coordinates.test.sql`. The hosted `StationSites` table was still empty when the migration was written.
+
+`StationSites` stores a location twice, just as `Stations` did: `Longitude`/`Latitude` (`numeric`, `NOT NULL`) and `CoordinateLocation` (plain `geography`, `NOT NULL UNIQUE`, written separately). The two tables were never meant to differ. This step makes `StationSites` match `Stations` after S2:
+- `Longitude`/`Latitude` are the source of truth, with the same range checks.
+- `CoordinateLocation` becomes a stored generated `geography(Point, 4326)` column that can't be written directly.
+- `Elevation` is renamed `Elevation (FT)`. It's already stored in feet, and the new name matches `Stations`.
+
+**Uniqueness is dropped.** The baseline makes `CoordinateLocation` unique, so two sites can't share a point. Nothing needs that rule, and `Stations` doesn't have it. Dropping the column drops the constraint (`StationSites_CoordinateLocation_key`), and it isn't re-created.
+
+**Hosted data:** when this step was planned (2026-11-10), `StationSites` had no rows and no station had a `SiteID`, so nothing is lost by dropping the column. Re-run this check before migrating in case sites have been added since. For each row it reports the point type, the SRID, and how far the stored point is from `Longitude`/`Latitude`:
+
+```sql
+select "SiteID",
+       extensions.st_geometrytype("CoordinateLocation"::extensions.geometry) as point_type,
+       extensions.st_srid("CoordinateLocation")                              as srid,
+       extensions.st_distance("CoordinateLocation",
+         extensions.st_setsrid(
+           extensions.st_makepoint("Longitude", "Latitude"), 4326)::extensions.geography) as dist_m
+from public."StationSites";
+```
+
+If any row has a different point type or SRID, or a distance over 1 m, fix its `Longitude`/`Latitude` first.
+
+```sql
+alter table public."StationSites"
+  add constraint station_sites_longitude_range check ("Longitude" between -180 and 180),
+  add constraint station_sites_latitude_range  check ("Latitude"  between  -90 and  90);
+
+alter table public."StationSites" rename column "Elevation" to "Elevation (FT)";
+
+alter table public."StationSites" drop column "CoordinateLocation";  -- also drops StationSites_CoordinateLocation_key
+
+alter table public."StationSites"
+  add column "CoordinateLocation" extensions.geography(Point, 4326)
+  generated always as (
+    extensions.st_setsrid(
+      extensions.st_makepoint("Longitude"::float8, "Latitude"::float8), 4326
+    )::extensions.geography
+  ) stored;
+
+comment on column public."StationSites"."CoordinateLocation" is
+  'Generated from Longitude/Latitude (WGS 84). Read-only: edit Longitude and Latitude instead.';
+```
+
+**Also in this step:**
+- **Seed:** `supabase/seed.sql` has no sites yet. Add two sites near Sitka, with an `Elevation (FT)` on one. Put stations 1 and 2 at site 1 (a site with more than one station) and leave site 2 empty. Advance the `SiteID` sequence past them.
+- **Docs:** update the `StationSites` rows in [schema.md](../schema.md). `CoordinateLocation` becomes `geography(Point, 4326)`, generated and read-only, and is no longer unique. `Elevation` becomes `Elevation (FT)`.
+
+**Tests** (`supabase/tests/02_station_sites_coordinates.test.sql`), mirroring S2's coordinate tests:
+- `CoordinateLocation` is a stored generated `geography(Point, 4326)`, and every seeded site's point matches its `Longitude`/`Latitude`.
+- Updating `Longitude` moves the point.
+- Writing `CoordinateLocation` directly in an insert or update raises `428C9`.
+- An out-of-range latitude or longitude raises `23514`.
+- A site inserted with only `Longitude`/`Latitude` succeeds.
+- `has_column` passes for `Elevation (FT)` and `hasnt_column` passes for `Elevation`.
+- **Parity:** the shared columns (`Longitude`, `Latitude`, `CoordinateLocation`, `Elevation (FT)`) have the same type, nullability, and generation expression in both tables, and both tables have the same range checks. A later change to one table that isn't made to the other fails this test.
 
 ### S3. Row-level security for `anon` — map `0.6.0`
 
@@ -356,7 +469,7 @@ Catches the hosted database drifting from the repo: a table or policy edited in 
 
 ## Order of work
 
-S1 → S2 → S3 → S4 → S5 → S6, with S7 anywhere after S3 and before map commit 10. The map backend doesn't call Supabase until map commit 10, so there's no window during these steps where the live map is broken or exposed. S7 should land before the live map relies on the access rules, so the drift check is guarding them from day one. Until S7 lands, push by hand with `supabase db push` as described in each step.
+S1 → S2 → S2b → S3 → S4 → S5 → S6, with S7 anywhere after S3 and before map commit 10. The map backend doesn't call Supabase until map commit 10, so there's no window during these steps where the live map is broken or exposed. S7 should land before the live map relies on the access rules, so the drift check is guarding them from day one. Until S7 lands, push by hand with `supabase db push` as described in each step.
 
 Once the map is live, push any migration that changes access (a revoke, a grant, or a function's columns) in the same `supabase db push` as the function changes that go with it.
 
@@ -364,4 +477,4 @@ The map's backend foundation (map commits 7–9) doesn't depend on any of this a
 
 ## Open questions
 
-1. **Which coordinates are the source of truth?** `Stations` stores a location twice: `Longitude`/`Latitude` (`numeric`) and `CoordinateLocation` (`geometry`). `map_stations()` masks `Longitude`/`Latitude`. If the two can drift apart (for example, one is edited in the dashboard and the other isn't), S2 could make `CoordinateLocation` a generated column built from them, or add a trigger that keeps them in sync. Note also that `Stations.CoordinateLocation` is `geometry` while `StationSites.CoordinateLocation` is `geography`. That's harmless for the map, but worth making consistent.
+None. The question about which coordinate column is the source of truth is settled in [S2](#s2-foreign-keys-identity-fix-indexes-and-station-coordinates--map-050): `Longitude`/`Latitude` are, and `CoordinateLocation` becomes a `geography` column generated from them.
