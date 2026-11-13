@@ -3,6 +3,90 @@
 Versioning follows `xx.yy.zz` (see [documentation/CLAUDECODE/CLAUDE.md](../CLAUDECODE/CLAUDE.md)):
 `xx` = major feature, `yy` = steps/commits toward a major feature, `zz` = small updates and revisions.
 
+## 0.16.0 — 2026-11-12
+
+Map commit 12: stations on the map as waypoints, with popups. **Feature:** stations show up at their masked locations, inactive ones greyed out, and show their name, code, and active status when clicked.
+- **`core/map-state.ts`:** `MapState` holds signals for the manifest and its load status, filter values by layer, and each layer's load status (count or error). `visibleLayers` lists the `default_visible` layers.
+- **`map/` (`MapView`):** loads the manifest, then fetches and draws each visible layer. It redraws a layer when its filters change, and cancels in-flight requests. It fits the view to the first features drawn. Zoom is capped at 14, because the points are approximate. The placeholder Sitka marker is gone.
+- **`layers/registry.ts`:** a marker style per layer id (stations navy), with a default for any other layer.
+- **`layers/markers.ts`:** keyboard-focusable SVG markers with a title. Muted features are drawn at 50% opacity with a gray outline.
+- **`layers/popup.ts`:** the popup lists the layer's `popup_fields` with their values, then "Approximate location". It's built as text nodes, so database values can't inject markup.
+- **`status-badge/`:** the backend health badge, now its own component, with `role="status"`.
+- **Removed:** Leaflet's default-icon setup and `src/assets.d.ts`, which are no longer needed.
+- **Tests:** 39 frontend tests (from 15):
+  - `MapView` with a fake API and a real Leaflet map in jsdom: markers per visible layer, muting, popup on click, the zoom cap, and a failed load recorded with no markers
+  - `MapState`: loading, errors, visible layers, and filters
+  - `StatusBadge`
+  - styles, markers (including no markup injection), and popups
+- **Checked** with `npm run dev:map` against the local Supabase stack, through the dev proxy.
+- **Docs:** the map and frontend READMEs (quickstart: stations need the backend's Supabase settings; directory guides), and the plan's step 12 note.
+
+**Files changed**
+- `map/frontend/src/app/core/map-state.ts`
+- `map/frontend/src/app/core/map-state.spec.ts`
+- `map/frontend/src/app/layers/registry.ts`
+- `map/frontend/src/app/layers/markers.ts`
+- `map/frontend/src/app/layers/popup.ts`
+- `map/frontend/src/app/layers/layers.spec.ts`
+- `map/frontend/src/app/map/map.ts`
+- `map/frontend/src/app/map/map.html`
+- `map/frontend/src/app/map/map.scss`
+- `map/frontend/src/app/map/map.spec.ts`
+- `map/frontend/src/app/status-badge/status-badge.ts`
+- `map/frontend/src/app/status-badge/status-badge.html`
+- `map/frontend/src/app/status-badge/status-badge.scss`
+- `map/frontend/src/app/status-badge/status-badge.spec.ts`
+- `map/frontend/src/styles.scss`
+- `map/frontend/src/assets.d.ts` (deleted)
+- `map/frontend/README.md`
+- `map/README.md`
+- `documentation/map/map_app_plan.md`
+- `documentation/map/CHANGELOG.md`
+
+## 0.15.0 — 2026-11-12
+
+Map commit 11: frontend models and API client.
+- **`core/models.ts`:** TypeScript types for the whole API contract: `LayerManifest`, `FilterDef` and `FilterOption` (with `implies` and `hint`), `PopupField`, `StyleBy`, GeoJSON `Feature` and `FeatureCollection`, `Detail`, the error body, and `ApiError`. Field names match the JSON, and every field is read-only.
+- **`core/map-api.ts`:** `MapApi` with `health()`, `layers()` (unwraps `{layers}`), `features(layer, filters)`, and `detail(layer, id)`. It replaces `services/api.ts`, which is deleted.
+- **`filterParams`:** turns filter values into the query parameters the backend parses. Lists are comma-joined, booleans become `true`/`false`, and null or empty values are left out.
+- **`describeApiError`:** reduces any failure to `{status, code, message}`: the API's own code (such as `masking_unavailable`), `network_error`, `http_error`, or `unknown_error`.
+- **`MapView`** now uses `MapApi` for the health badge. No visible change.
+- **Tests:** 15 frontend tests (from 2). `map-api.spec.ts` uses `HttpTestingController` to check each route's URL and parameters, the manifest unwrap, layer-id encoding, error pass-through, parameter building, and error descriptions.
+- **Docs:** the map and frontend README directory guides (`core/` replaces `services/`), and the plan's step 11 note.
+
+**Files changed**
+- `map/frontend/src/app/core/models.ts`
+- `map/frontend/src/app/core/map-api.ts`
+- `map/frontend/src/app/core/map-api.spec.ts`
+- `map/frontend/src/app/services/api.ts` (deleted)
+- `map/frontend/src/app/map/map.ts`
+- `map/frontend/README.md`
+- `map/README.md`
+- `documentation/map/map_app_plan.md`
+- `documentation/map/CHANGELOG.md`
+
+## 0.14.0 — 2026-11-12
+
+Map commit 10: the stations layer, the first layer the API serves.
+- **`layers/stations.py`:** `features()` calls `map_stations` and returns each station as a Point at its masked location. Properties: `name`, `code` (`"—"` when null or empty), `active` (`"Yes"`, `"No"`, `"Unknown"`), and `muted` (`true` for inactive stations). Popup fields: Station, Code, Active. Location note: "Approximate location". Muted label: "Inactive".
+- **Detail:** `/api/layers/stations/features/<id>` calls `map_stations` with `p_station`. It returns the same three fields in one "Overview" section, or 404. Its raw `data` holds `code` and `is_active`, and no coordinates.
+- **Registry:** `REGISTRY` now lists the stations layer. It has no filters yet, so query parameters are a 400 until step 13.
+- **Tests:** 135 (from 119). `test_stations.py` uses rows shaped like `map_stations` output from the local stack. It covers properties, muting, missing codes, no raw-column leaks, the manifest entry, detail and 404, and `MaskingUnavailableError` → 503 with no features. The default test app now registers no layers.
+- **Checked live** on the local stack with the dev server: the manifest, 4 masked features, detail, 404, and a 503 while the Vault secret was renamed.
+- **Docs:** the backend README's intro and directory guide, and the plan's step 10 note. `pyproject.toml` is at `0.14.0`.
+
+**Files changed**
+- `map/backend/src/backend/layers/stations.py`
+- `map/backend/src/backend/layers/__init__.py`
+- `map/backend/tests/test_stations.py`
+- `map/backend/tests/test_api.py`
+- `map/backend/tests/conftest.py`
+- `map/backend/pyproject.toml`
+- `map/backend/uv.lock`
+- `map/backend/README.md`
+- `documentation/map/map_app_plan.md`
+- `documentation/map/CHANGELOG.md`
+
 ## 0.13.0 — 2026-11-12
 
 Map commit 9: the layer framework and its generic routes.

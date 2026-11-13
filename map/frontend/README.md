@@ -34,7 +34,8 @@ npm test -w map-frontend         # Vitest unit tests
 | `src/main.ts` | Browser entry point |
 | `src/styles.scss` | Global styles |
 | `src/app/` | Root component (`app.ts`), routes (`app.routes.ts`), providers (`app.config.ts`) |
-| `src/app/map/` | Leaflet map page (`MapView`) |
-| `src/app/services/` | `Api`: HTTP client for the Flask backend |
-| `src/assets.d.ts` | Lets TypeScript import `.png` files as URLs |
+| `src/app/map/` | `MapView`: the Leaflet map. Draws each visible layer from the manifest and redraws it when its filters change. Zoom is capped at 14. |
+| `src/app/core/` | `models.ts`: types for the API contract. `map-api.ts`: `MapApi` (health, layers, features, detail), `filterParams`, and `describeApiError`. `map-state.ts`: `MapState`, the shared signals (manifest, filter values, load status). |
+| `src/app/layers/` | How layers look: `registry.ts` (marker style per layer id, with a default), `markers.ts` (SVG marker factory, muted styling), `popup.ts` (popup built from the manifest's `popup_fields`) |
+| `src/app/status-badge/` | `StatusBadge`: the backend health badge |
 | `proxy.conf.json` | Dev proxy: `/api/*` → `http://127.0.0.1:5001` |

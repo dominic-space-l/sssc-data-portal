@@ -348,15 +348,44 @@ Each step adds its own pgTAP tests.
 - Popup fields: Station, Code, Active. Detail: the same three fields, as one section, from the same function filtered to one id.
 - Add it to `REGISTRY`. Tests use RPC-shaped fixture rows, plus a check that `MaskingUnavailableError` from the fake database becomes a 503.
 
+> **Done (0.14.0).** What the implementation decided:
+> - **Properties are exactly `name`, `code`, `active`, `muted`.** Raw columns (`is_active`, `roles`) aren't passed through. `code` is `"—"` for a null *or empty* `StationCode` (the column defaults to `''`). An unknown status (`is_active` null) is `"Unknown"` and not muted.
+> - **No filters and no options yet.** `filters` is empty, so any query parameter is a 400 until step 13. `options()` returns nothing, so the manifest makes no database call. The route still needs Supabase settings to build it.
+> - **Detail:** title is the station name, one "Overview" section with the three popup fields, and `data` with the raw `code` and `is_active`. No coordinates appear, masked or not.
+> - **Checked live on the local stack:** the manifest, 4 masked features (station 3 muted, station 4's code `"—"`), detail and 404, and a 503 `masking_unavailable` with no coordinates while the Vault secret was renamed.
+
 **11. Frontend models and API client — `0.15.0`**
 - `core/models.ts` typed to match the API contract, including `FilterOption.implies`, `FilterOption.hint`, and `StyleBy`. `core/map-api.ts` (`health()`, `layers()`, `features(layer, filters)`, `detail(layer, id)`) replaces `services/api.ts`.
 - Tests with `HttpTestingController`.
+
+> **Done (0.15.0).** What the implementation decided:
+> - **Types mirror the JSON exactly**, including snake_case names (`default_visible`, `active_when`, `fallback_label`), so responses need no mapping. Every field is `readonly`. `FilterValue` is `number | readonly number[] | boolean | null`, and an id is always a number.
+> - **`layers()` unwraps `{"layers": [...]}`** and emits the array.
+> - **`filterParams`** (exported) turns filter values into query parameters: lists are comma-joined (`station_type=1,2`, sent unescaped), booleans become `true`/`false`, and null, undefined, or empty lists are left out. `0` and `false` are kept. The layer id is URL-encoded in the path.
+> - **`describeApiError`** reduces a failed request to `{status, code, message}`:
+>   - the API's own code and message when the body has them (`masking_unavailable`, ...)
+>   - `network_error` with status 0 when the server can't be reached
+>   - `http_error` for a non-JSON error, such as a proxy's HTML page
+>   - `unknown_error` for anything else
+>
+>   Step 12 stores this in `MapState`. Step 17 shows it.
+> - `MapView` uses `MapApi.health()` until step 12 rewrites it.
 
 **12. Station waypoints and popups — `0.16.0`**
 - `core/map-state.ts`: signals for the manifest, per-layer filter values, and loading/error state.
 - `MapView`: loads the manifest, then draws each `default_visible` layer with `L.geoJSON`, using `layers/registry.ts` styles (or a default) and the marker factory in `layers/markers.ts`. Clicking a marker opens a popup built from `popup_fields`, plus `location_note`. Markers with `muted: true` are drawn greyed out (reduced opacity, gray outline). `maxZoom` is capped at 14.
 - Remove the placeholder Sitka marker, and pull the status badge out into `status-badge/`.
 - **Feature:** stations show up as waypoints, inactive ones greyed out, and present their name, code, and active status when clicked.
+
+> **Done (0.16.0).** What the implementation decided:
+> - **`MapState`** holds read-only signals for `manifest`, `manifestStatus`/`manifestError`, `filters` (by layer id, read with `filtersFor`), and `layerLoads` (each layer's `status`, `count`, or `ApiError`). `visibleLayers` is computed from `default_visible`. Nothing writes filters yet. Step 13's filter panel will.
+> - **`MapView` redraws from an `effect`** over the map, the visible layers, and each layer's filters. Step 13's filter changes therefore redraw with no new wiring, and a newer request cancels an in-flight one. The view fits the first features drawn (up to zoom 12) and keeps the user's view on later redraws. `maxZoom` is 14 on the map and the tile layer.
+> - **Markers are `L.marker`s with an inline-SVG `divIcon`** (`layers/markers.ts`), not `circleMarker`s, so they're keyboard-focusable, carry a `title`, and step 15's pies can reuse the same SVG approach. Only style constants go into the SVG markup. Muted markers are drawn at 50% opacity with a gray (`#757575`) outline, keeping their fill. A focus ring is styled globally.
+> - **Points are drawn into an `L.featureGroup`**, not with `L.geoJSON`. The API types are point-only and read-only, and Leaflet's GeoJSON types would need an unsafe cast. A future polygon layer would add a branch in `draw()`.
+> - **Popups are built from DOM nodes with `textContent`** (`layers/popup.ts`), never HTML strings. A station name with markup renders as text. Missing values show `—`.
+> - **`StatusBadge`** (`status-badge/`) is now its own component, with `role="status"`. The placeholder Sitka marker, Leaflet's default-icon setup, and `src/assets.d.ts` (PNG imports) are removed.
+> - **Errors** are recorded in `MapState` (`layerLoads[...].error`, `manifestError`) but not shown yet. Step 17 adds the visible error state.
+> - **Checked** with `npm run dev:map` against the local Supabase stack: the page, health, manifest, and 4 stations (station 3 muted) all served through the dev proxy. No headless browser was available, so the rendered map itself was checked only in jsdom tests.
 
 ### Filtering and coloring
 

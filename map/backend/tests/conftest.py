@@ -19,15 +19,15 @@ ENV_NAMES = ("SUPABASE_URL", "SUPABASE_KEY", "CACHE_MAX_AGE")
 
 @pytest.fixture
 def app():
-    """An app with no Supabase settings and no layers, as on a fresh checkout.
+    """An app with no Supabase settings and no layers registered.
 
     Returns:
-        A Flask app built with ``Config()``.
+        A Flask app built with ``Config()`` and ``layers=[]``.
 
     Usage:
         def test_x(app): assert app.config["MAP_CONFIG"] == Config()
     """
-    return create_app(Config())
+    return create_app(Config(), layers=[])
 
 
 @pytest.fixture
