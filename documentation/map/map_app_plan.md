@@ -358,6 +358,19 @@ Each step adds its own pgTAP tests.
 - `core/models.ts` typed to match the API contract, including `FilterOption.implies`, `FilterOption.hint`, and `StyleBy`. `core/map-api.ts` (`health()`, `layers()`, `features(layer, filters)`, `detail(layer, id)`) replaces `services/api.ts`.
 - Tests with `HttpTestingController`.
 
+> **Done (0.15.0).** What the implementation decided:
+> - **Types mirror the JSON exactly**, including snake_case names (`default_visible`, `active_when`, `fallback_label`), so responses need no mapping. Every field is `readonly`. `FilterValue` is `number | readonly number[] | boolean | null`, and an id is always a number.
+> - **`layers()` unwraps `{"layers": [...]}`** and emits the array.
+> - **`filterParams`** (exported) turns filter values into query parameters: lists are comma-joined (`station_type=1,2`, sent unescaped), booleans become `true`/`false`, and null, undefined, or empty lists are left out. `0` and `false` are kept. The layer id is URL-encoded in the path.
+> - **`describeApiError`** reduces a failed request to `{status, code, message}`:
+>   - the API's own code and message when the body has them (`masking_unavailable`, ...)
+>   - `network_error` with status 0 when the server can't be reached
+>   - `http_error` for a non-JSON error, such as a proxy's HTML page
+>   - `unknown_error` for anything else
+>
+>   Step 12 stores this in `MapState`. Step 17 shows it.
+> - `MapView` uses `MapApi.health()` until step 12 rewrites it.
+
 **12. Station waypoints and popups — `0.16.0`**
 - `core/map-state.ts`: signals for the manifest, per-layer filter values, and loading/error state.
 - `MapView`: loads the manifest, then draws each `default_visible` layer with `L.geoJSON`, using `layers/registry.ts` styles (or a default) and the marker factory in `layers/markers.ts`. Clicking a marker opens a popup built from `popup_fields`, plus `location_note`. Markers with `muted: true` are drawn greyed out (reduced opacity, gray outline). `maxZoom` is capped at 14.

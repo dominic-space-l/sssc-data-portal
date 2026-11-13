@@ -19,7 +19,7 @@ import * as L from 'leaflet';
 import iconRetinaUrl from 'leaflet/dist/images/marker-icon-2x.png';
 import iconUrl from 'leaflet/dist/images/marker-icon.png';
 import shadowUrl from 'leaflet/dist/images/marker-shadow.png';
-import { Api } from '../services/api';
+import { MapApi } from '../core/map-api';
 
 // Placeholder view: Sitka, AK
 const INITIAL_CENTER: L.LatLngExpression = [57.04907, -135.33905];
@@ -37,7 +37,7 @@ L.Icon.Default.mergeOptions({ iconRetinaUrl, iconUrl, shadowUrl });
   styleUrl: './map.scss',
 })
 export class MapView {
-  private readonly api = inject(Api);
+  private readonly api = inject(MapApi);
   private readonly container = viewChild.required<ElementRef<HTMLDivElement>>('map');
 
   protected readonly backendStatus = signal('checking…');

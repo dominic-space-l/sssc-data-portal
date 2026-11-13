@@ -3,6 +3,28 @@
 Versioning follows `xx.yy.zz` (see [documentation/CLAUDECODE/CLAUDE.md](../CLAUDECODE/CLAUDE.md)):
 `xx` = major feature, `yy` = steps/commits toward a major feature, `zz` = small updates and revisions.
 
+## 0.15.0 — 2026-11-12
+
+Map commit 11: frontend models and API client.
+- **`core/models.ts`:** TypeScript types for the whole API contract: `LayerManifest`, `FilterDef` and `FilterOption` (with `implies` and `hint`), `PopupField`, `StyleBy`, GeoJSON `Feature` and `FeatureCollection`, `Detail`, the error body, and `ApiError`. Field names match the JSON, and every field is read-only.
+- **`core/map-api.ts`:** `MapApi` with `health()`, `layers()` (unwraps `{layers}`), `features(layer, filters)`, and `detail(layer, id)`. It replaces `services/api.ts`, which is deleted.
+- **`filterParams`:** turns filter values into the query parameters the backend parses. Lists are comma-joined, booleans become `true`/`false`, and null or empty values are left out.
+- **`describeApiError`:** reduces any failure to `{status, code, message}`: the API's own code (such as `masking_unavailable`), `network_error`, `http_error`, or `unknown_error`.
+- **`MapView`** now uses `MapApi` for the health badge. No visible change.
+- **Tests:** 15 frontend tests (from 2). `map-api.spec.ts` uses `HttpTestingController` to check each route's URL and parameters, the manifest unwrap, layer-id encoding, error pass-through, parameter building, and error descriptions.
+- **Docs:** the map and frontend README directory guides (`core/` replaces `services/`), and the plan's step 11 note.
+
+**Files changed**
+- `map/frontend/src/app/core/models.ts`
+- `map/frontend/src/app/core/map-api.ts`
+- `map/frontend/src/app/core/map-api.spec.ts`
+- `map/frontend/src/app/services/api.ts` (deleted)
+- `map/frontend/src/app/map/map.ts`
+- `map/frontend/README.md`
+- `map/README.md`
+- `documentation/map/map_app_plan.md`
+- `documentation/map/CHANGELOG.md`
+
 ## 0.14.0 — 2026-11-12
 
 Map commit 10: the stations layer, the first layer the API serves.

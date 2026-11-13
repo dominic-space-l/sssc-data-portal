@@ -35,6 +35,6 @@ npm test -w map-frontend         # Vitest unit tests
 | `src/styles.scss` | Global styles |
 | `src/app/` | Root component (`app.ts`), routes (`app.routes.ts`), providers (`app.config.ts`) |
 | `src/app/map/` | Leaflet map page (`MapView`) |
-| `src/app/services/` | `Api`: HTTP client for the Flask backend |
+| `src/app/core/` | `models.ts`: types for the API contract. `map-api.ts`: `MapApi` (health, layers, features, detail), `filterParams`, and `describeApiError` |
 | `src/assets.d.ts` | Lets TypeScript import `.png` files as URLs |
 | `proxy.conf.json` | Dev proxy: `/api/*` → `http://127.0.0.1:5001` |

@@ -19,7 +19,7 @@
 | `backend/tests/` | pytest tests |
 | `frontend/` | Angular + Leaflet app. See [frontend/README.md](frontend/README.md). |
 | `frontend/src/app/map/` | The Leaflet map page |
-| `frontend/src/app/services/` | HTTP client for the backend |
+| `frontend/src/app/core/` | API types (`models.ts`) and the HTTP client for the backend (`map-api.ts`) |
 | `frontend/proxy.conf.json` | Dev proxy: `/api/*` → backend on port 5001 |
 
 Planning docs and the changelog live in [`documentation/map/`](../documentation/map/).
