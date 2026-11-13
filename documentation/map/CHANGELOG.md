@@ -3,6 +3,25 @@
 Versioning follows `xx.yy.zz` (see [documentation/CLAUDECODE/CLAUDE.md](../CLAUDECODE/CLAUDE.md)):
 `xx` = major feature, `yy` = steps/commits toward a major feature, `zz` = small updates and revisions.
 
+## 0.9.0 — 2026-11-12
+
+Supabase step S6: `public.map_filter_options`, the options for the public map's filter dropdowns.
+- **Function:** one call returns a jsonb object with five lists: `projects` (every project by name, with its `organization_id` and `station_count`), `organizations`, `station_types`, `observation_types` (each by name), and `roles` (by id, the order the map assigns colors in). An empty table gives `[]`, not `null`.
+- **Organizations:** listed when they hold a role at a station *or* manage a project. The plan listed only those with a role. But choosing a project fills in its managing organization, which must then be in the dropdown. On its own, an organization with no role shows an empty map.
+- **Privacy:** only ids, names, `organization_id`, and `station_count` come out. Notes fields are never returned. The function doesn't touch coordinates and works without the Vault secret.
+- **Access:** `security definer` with an empty `search_path`. Execute is revoked from `PUBLIC`, `anon`, and `authenticated`, then granted to `anon` alone. Added to the S3 test's anon allowlist, which now holds both map functions.
+- **Tests:** new pgTAP tests check the definition and privileges. As anon, they check each list's exact contents and order, including the empty project's `station_count` of 0 and the organization with no role that manages a project. They also check that an organization with neither isn't listed, that `station_count` follows inserts, that an empty table gives `[]`, and that no notes key, notes text, or coordinate field appears at any depth. Finally, they check that it works without the secret and that `authenticated` can't call it.
+- **Docs:** marked S6 done in the plan and updated its SQL and tests for the organization rule. The organization filter in `map_app_plan.md` now uses the same rule. `supabase/README.md` lists `map_filter_options` with `map_stations`.
+
+**Files changed**
+- `supabase/migrations/20261113024359_s6_map_filter_options.sql`
+- `supabase/tests/06_map_filter_options.test.sql`
+- `supabase/tests/03_anon_rls.test.sql`
+- `supabase/README.md`
+- `documentation/map/supabase_plan.md`
+- `documentation/map/map_app_plan.md`
+- `documentation/map/CHANGELOG.md`
+
 ## 0.8.0 — 2026-11-12
 
 Supabase step S5: `public.map_stations`, the public map's only way to read stations.

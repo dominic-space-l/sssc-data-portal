@@ -61,6 +61,7 @@ The anon key is public, so the anon role gets no access to tables (since map `0.
 | Function | Since | Returns |
 | --- | --- | --- |
 | `map_stations(p_project, p_organization, p_station_types, p_observation_types, p_station)` | `0.8.0` (S5) | The map's stations: id, name, code, active flag, a masked point (250–500 m from the true one), and the organization's role ids at each station. `null` means "no filter" for every parameter. The organization filters only when no project is given. |
+| `map_filter_options()` | `0.9.0` (S6) | One jsonb object with the map's dropdown options: `projects` (with `organization_id` and `station_count`), `organizations` (those that hold a role or manage a project), `station_types`, `observation_types`, and `roles`. Ids and names only, never notes. |
 
 Each one is `security definer` with an empty `search_path`, and returns a fixed list of columns, so adding a field to the public map means a reviewed migration. Its execute privilege is revoked from `PUBLIC` and `authenticated` and granted to `anon` alone. `tests/03_anon_rls.test.sql` checks all of this from the catalog, so it fails if:
 

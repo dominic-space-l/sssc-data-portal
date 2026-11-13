@@ -391,6 +391,12 @@ comment on function public.map_stations(bigint, bigint, bigint[], bigint[], bigi
 
 ### S6. `map_filter_options` function — map `0.9.0`
 
+> **Done (0.9.0).** Migration `20261113024359_s6_map_filter_options.sql`, tests in `supabase/tests/06_map_filter_options.test.sql`. What the implementation changed or found:
+> - **Organizations that manage a project are listed too**, not only those holding a role. Every project has a managing organization (`OrganizationProjects.OrganizationID` is `NOT NULL`), and choosing a project fills it in as the organization. If that organization held no role, the value wouldn't be in the dropdown. The seed already has this case: Project Empty is managed by Test Org C, which holds no roles. On its own, such an organization shows an empty map with the generic "No stations match these filters" message. Organizations carry no station count. The SQL below shows the change.
+> - The revoke also names `anon`, the same as S5.
+> - The function doesn't call `mask_point`, so it works without the Vault secret.
+> - Lint and the security advisors report nothing. Over the local API, `rpc/map_filter_options` returns 200 for anon, by `POST` or `GET`.
+
 One call returns everything the backend needs to build the manifest's dropdowns. Each project carries a `station_count`, so the map can tag projects that have none with "No stations":
 
 ```sql
@@ -413,7 +419,9 @@ as $$
                order by o."OrganizationName"), '[]')
       from public."Organizations" o
       where exists (select 1 from public."StationOrganizationRole" sor
-                    where sor."OrganizationID" = o."OrganizationID")),
+                    where sor."OrganizationID" = o."OrganizationID")
+         or exists (select 1 from public."OrganizationProjects" p
+                    where p."OrganizationID" = o."OrganizationID")),
     'station_types', (
       select coalesce(jsonb_agg(jsonb_build_object('id', t."TypeID", 'name', t."TypeName")
                order by t."TypeName"), '[]')
@@ -432,12 +440,12 @@ $$;
 revoke all on function public.map_filter_options() from public, anon, authenticated;
 grant execute on function public.map_filter_options() to anon;
 comment on function public.map_filter_options() is
-  'Dropdown options for the public map: projects (with station counts), organizations with roles, types, roles.';
+  'Dropdown options for the public map: projects (with station counts), organizations with a role or a project, types, roles.';
 ```
 
 `OrganizationNotes`, `ProjectNotes`, and `RoleNotes` are left out on purpose. Notes fields tend to collect internal details.
 
-**Tests:** add `map_filter_options` to the `anon_functions` allowlist in `supabase/tests/03_anon_rls.test.sql`. As `anon`, the function succeeds. Every project is listed, including the seeded one with no stations, which has `station_count = 0`. Each project carries its `organization_id`. Only organizations with at least one role are listed. No key contains a notes field.
+**Tests:** add `map_filter_options` to the `anon_functions` allowlist in `supabase/tests/03_anon_rls.test.sql`. As `anon`, the function succeeds. Every project is listed, including the seeded one with no stations, which has `station_count = 0`. Each project carries its `organization_id`. Only organizations that hold a role or manage a project are listed. No key contains a notes field.
 
 ### S7. Deploy and drift-check workflows — map: next free `yy` when it lands
 
