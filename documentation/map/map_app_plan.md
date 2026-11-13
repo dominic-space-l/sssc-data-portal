@@ -348,6 +348,12 @@ Each step adds its own pgTAP tests.
 - Popup fields: Station, Code, Active. Detail: the same three fields, as one section, from the same function filtered to one id.
 - Add it to `REGISTRY`. Tests use RPC-shaped fixture rows, plus a check that `MaskingUnavailableError` from the fake database becomes a 503.
 
+> **Done (0.14.0).** What the implementation decided:
+> - **Properties are exactly `name`, `code`, `active`, `muted`.** Raw columns (`is_active`, `roles`) aren't passed through. `code` is `"—"` for a null *or empty* `StationCode` (the column defaults to `''`). An unknown status (`is_active` null) is `"Unknown"` and not muted.
+> - **No filters and no options yet.** `filters` is empty, so any query parameter is a 400 until step 13. `options()` returns nothing, so the manifest makes no database call. The route still needs Supabase settings to build it.
+> - **Detail:** title is the station name, one "Overview" section with the three popup fields, and `data` with the raw `code` and `is_active`. No coordinates appear, masked or not.
+> - **Checked live on the local stack:** the manifest, 4 masked features (station 3 muted, station 4's code `"—"`), detail and 404, and a 503 `masking_unavailable` with no coordinates while the Vault secret was renamed.
+
 **11. Frontend models and API client — `0.15.0`**
 - `core/models.ts` typed to match the API contract, including `FilterOption.implies`, `FilterOption.hint`, and `StyleBy`. `core/map-api.ts` (`health()`, `layers()`, `features(layer, filters)`, `detail(layer, id)`) replaces `services/api.ts`.
 - Tests with `HttpTestingController`.

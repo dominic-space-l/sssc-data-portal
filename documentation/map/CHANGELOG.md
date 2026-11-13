@@ -3,6 +3,28 @@
 Versioning follows `xx.yy.zz` (see [documentation/CLAUDECODE/CLAUDE.md](../CLAUDECODE/CLAUDE.md)):
 `xx` = major feature, `yy` = steps/commits toward a major feature, `zz` = small updates and revisions.
 
+## 0.14.0 — 2026-11-12
+
+Map commit 10: the stations layer, the first layer the API serves.
+- **`layers/stations.py`:** `features()` calls `map_stations` and returns each station as a Point at its masked location. Properties: `name`, `code` (`"—"` when null or empty), `active` (`"Yes"`, `"No"`, `"Unknown"`), and `muted` (`true` for inactive stations). Popup fields: Station, Code, Active. Location note: "Approximate location". Muted label: "Inactive".
+- **Detail:** `/api/layers/stations/features/<id>` calls `map_stations` with `p_station`. It returns the same three fields in one "Overview" section, or 404. Its raw `data` holds `code` and `is_active`, and no coordinates.
+- **Registry:** `REGISTRY` now lists the stations layer. It has no filters yet, so query parameters are a 400 until step 13.
+- **Tests:** 135 (from 119). `test_stations.py` uses rows shaped like `map_stations` output from the local stack. It covers properties, muting, missing codes, no raw-column leaks, the manifest entry, detail and 404, and `MaskingUnavailableError` → 503 with no features. The default test app now registers no layers.
+- **Checked live** on the local stack with the dev server: the manifest, 4 masked features, detail, 404, and a 503 while the Vault secret was renamed.
+- **Docs:** the backend README's intro and directory guide, and the plan's step 10 note. `pyproject.toml` is at `0.14.0`.
+
+**Files changed**
+- `map/backend/src/backend/layers/stations.py`
+- `map/backend/src/backend/layers/__init__.py`
+- `map/backend/tests/test_stations.py`
+- `map/backend/tests/test_api.py`
+- `map/backend/tests/conftest.py`
+- `map/backend/pyproject.toml`
+- `map/backend/uv.lock`
+- `map/backend/README.md`
+- `documentation/map/map_app_plan.md`
+- `documentation/map/CHANGELOG.md`
+
 ## 0.13.0 — 2026-11-12
 
 Map commit 9: the layer framework and its generic routes.

@@ -1,6 +1,6 @@
 # Map Backend
 
-Flask API that serves data to the map frontend. It has settings from the environment, a Supabase database wrapper, JSON error responses, and a generic layer framework with its routes. No layers are registered yet: map commit 10 adds the stations layer. See [the map plan](../../documentation/map/map_app_plan.md) for what comes next.
+Flask API that serves data to the map frontend. It has settings from the environment, a Supabase database wrapper, JSON error responses, and a generic layer framework with its routes. It serves one layer, **stations**: every monitoring station at a masked location, with its name, code, and active status. See [the map plan](../../documentation/map/map_app_plan.md) for what comes next.
 
 ## Quickstart
 From the repo root:
@@ -106,6 +106,7 @@ Tests never read your `.env` or environment: fixtures in `tests/conftest.py` bui
 | `src/backend/errors.py` | JSON error handlers |
 | `src/backend/layers/__init__.py` | `REGISTRY` of layers, plus `get_layer` and `get_layers` |
 | `src/backend/layers/base.py` | The `Layer` protocol, manifest and detail types, filter parsing, GeoJSON helpers |
+| `src/backend/layers/stations.py` | The stations layer: `map_stations` rows as display-ready, masked point features |
 | `scripts/smoke_supabase.py` | Checks the anon key's access on a real Supabase project |
 | `tests/conftest.py` | Shared fixtures: `app` and `client` with no Supabase configured, and `clean_env` |
 | `tests/fakes.py` | `FakeDatabase` (canned rpc results) and `FakeLayer` (one filter of each type) |

@@ -19,9 +19,10 @@ from collections.abc import Sequence
 from flask import Flask, current_app
 
 from backend.layers.base import Layer
+from backend.layers.stations import STATIONS
 
-# Every layer the API serves, in manifest order. Map commit 10 adds the stations layer.
-REGISTRY: tuple[Layer, ...] = ()
+# Every layer the API serves, in manifest order.
+REGISTRY: tuple[Layer, ...] = (STATIONS,)
 
 # Key in app.extensions for the app's layers, by id.
 EXTENSION_KEY = "map_layers"

@@ -15,7 +15,7 @@ from fakes import FakeDatabase, FakeLayer
 from backend import create_app
 from backend.config import Config
 from backend.db import MaskingUnavailableError, UpstreamError
-from backend.layers import REGISTRY
+from backend.layers import REGISTRY, get_layers
 
 ROWS = [
     {"id": 1, "lon": -135.3341, "lat": 57.0511, "name": "First"},
@@ -48,13 +48,16 @@ def _client(db=None, layers=None, config=None):
 # ---------------------------------------------------------------------------------------
 
 
-def test_registry_is_empty_until_a_layer_is_added():
-    """REGISTRY starts empty. Map commit 10 adds the stations layer.
+def test_registry_serves_the_stations_layer():
+    """REGISTRY lists the stations layer, which create_app serves by default.
 
     Usage:
-        uv run pytest -k registry_is_empty
+        uv run pytest -k registry_serves
     """
-    assert REGISTRY == ()
+    assert [layer.id for layer in REGISTRY] == ["stations"]
+    app = create_app(Config(), FakeDatabase())
+    with app.app_context():
+        assert [layer.id for layer in get_layers()] == ["stations"]
 
 
 def test_manifest_with_no_layers_needs_no_database(client):
