@@ -1,7 +1,7 @@
 [project]
 name = "backend"
-version = "0.1.0"
-description = "Add your description here"
+version = "0.13.0"
+description = "Flask API that serves masked environmental monitoring station data to the map frontend."
 readme = "README.md"
 authors = [
     { name = "Nicholas-Turner", email = "nicholasoranturner@gmail.com" }
@@ -9,7 +9,7 @@ authors = [
 requires-python = ">=3.13"
 dependencies = [
     "flask>=3.1.3",
-    "pytest>=9.1.1",
+    "python-dotenv>=1.2.4",
     "supabase>=2.33.0",
 ]
 
@@ -22,6 +22,7 @@ build-backend = "uv_build"
 
 [dependency-groups]
 dev = [
+    "pytest>=9.2.0",
     "ruff>=0.17.3",
 ]
 

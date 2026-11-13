@@ -3,6 +3,97 @@
 Versioning follows `xx.yy.zz` (see [documentation/CLAUDECODE/CLAUDE.md](../CLAUDECODE/CLAUDE.md)):
 `xx` = major feature, `yy` = steps/commits toward a major feature, `zz` = small updates and revisions.
 
+## 0.13.0 — 2026-11-12
+
+Map commit 9: the layer framework and its generic routes.
+- **`layers/base.py`:**
+  - the `Layer` protocol: static `id`, `title`, `default_visible`, `location_note`, `muted_label`, `popup_fields`, `filters`, `style_by`, plus `options(db)`, `features(db, filters)`, and `detail(db, id)`
+  - manifest types (`PopupField`, `FilterDef`, `FilterOption` with `implies` and `hint`, `StyleBy`, `StyleValue`, `LayerOptions`) and detail types (`Detail`, `DetailSection`, `DetailField`, `Link`), each serializing to the API contract
+  - filter parsing, and the `point_feature` and `feature_collection` helpers
+- **Filter parsing:**
+  - Ids are ASCII whole numbers up to the bigint maximum.
+  - A multiselect takes repeated or comma-separated values, de-duplicated, up to 100. A boolean takes `true`/`false`/`1`/`0`.
+  - A blank value means no filter.
+  - An unknown parameter, an invalid value, or two values for a single-value filter is a 400 with a message naming the parameter.
+- **`layers/__init__.py`:** an empty `REGISTRY`, plus `get_layer` and `get_layers`. `create_app(config, database, layers)` copies the registry into the app and refuses duplicate or non-URL-safe layer ids.
+- **Routes:**
+  - `/api/layers` returns `{"layers": [...]}`. With no layers, it doesn't touch the database.
+  - `/api/layers/<layer>/features` returns a GeoJSON `FeatureCollection`.
+  - `/api/layers/<layer>/features/<int:id>` returns a detail, or 404.
+  - Unknown layers and features are a JSON 404. Database failures inside a layer keep their 502 or 503.
+- **Design:** filter options and `style_by` values come from a new `options(db)` method, called only for the manifest. The features route parses filters from the static definitions, with no extra database call.
+- **Tests:** 119 (from 55). `tests/fakes.py` adds `FakeDatabase` and `FakeLayer`. `test_layer_base.py` covers parsing per type, serialization, and manifest building. `test_api.py` covers each route against the fakes, filters reaching the layer, 400s, 404s, 502/503 pass-through, and registry validation. Checked by hand: a throwaway layer over `map_stations` on the local stack returned the expected stations for each filter combination.
+- **Docs:** the backend README has a "Layers and routes" section and an updated directory guide. `map/README.md`'s directory guide is updated. The plan's step 9 notes what was decided. `pyproject.toml` is at `0.13.0`.
+
+**Files changed**
+- `map/backend/src/backend/__init__.py`
+- `map/backend/src/backend/api.py`
+- `map/backend/src/backend/layers/__init__.py`
+- `map/backend/src/backend/layers/base.py`
+- `map/backend/tests/conftest.py`
+- `map/backend/tests/fakes.py`
+- `map/backend/tests/test_api.py`
+- `map/backend/tests/test_layer_base.py`
+- `map/backend/pyproject.toml`
+- `map/backend/uv.lock`
+- `map/backend/README.md`
+- `map/README.md`
+- `documentation/map/map_app_plan.md`
+- `documentation/map/CHANGELOG.md`
+
+## 0.12.0 — 2026-11-12
+
+Map commit 8: database access, errors, and the `/api` blueprint.
+- **`db.py`:** a `Database` protocol with `rpc(name, params)`, and `SupabaseDatabase`, the only code that imports `supabase`, with a 10-second timeout. The masking error (`P0001`, "location masking is not configured") becomes `MaskingUnavailableError`. Every other Supabase error, timeout, or connection failure becomes `UpstreamError`, with the cause logged on the server only. `get_database()` creates the client on first use and keeps it in `app.extensions`. Without Supabase settings, it raises `DatabaseNotConfiguredError`.
+- **`errors.py`:** every error is `{"error": {"code", "message"}}`. HTTP errors keep their status (`bad_request`, `not_found`, `method_not_allowed`, ...). `UpstreamError` is 502, `MaskingUnavailableError` and `DatabaseNotConfiguredError` are 503, and anything else is 500 `internal_error`, logged with its traceback. 5xx responses never include the cause.
+- **`api.py`:** a Blueprint at `/api`. `/api/health` moved into it unchanged.
+- **`create_app(config=None, database=None)`:** registers the blueprint and error handlers, and accepts a fake database for tests. The dev server now logs at INFO.
+- **`scripts/smoke_supabase.py`:** with the configured anon key, checks that `Stations` and `Contacts` refuse with permission denied (an empty result fails too), that `mask_point` is unreachable, and that `map_stations` (exactly seven columns) and `map_filter_options` (exactly five lists) answer. It prints no data. Locally, all 5 checks passed with both the publishable key and the legacy anon JWT. With a temporary `grant select on "Stations" to anon`, it failed as it should. Against the hosted project with its anon key, all 5 passed.
+- **Naming:** the plan's `MaskingUnavailable` is `MaskingUnavailableError`, for PEP 8 and ruff N818. The plan is updated to match.
+- **Tests:** 55 (from 29). `test_db.py` covers success and parameters, each error translation (shaped like what supabase-py raised against the local stack), logged-not-leaked details, the timeout, and lazy creation. `test_errors.py` covers each status and code, that no detail leaks, JSON 404 and 405, the 400 message passing through, and traceback logging. Against the live local stack, with the Vault secret renamed, `map_stations` raised `MaskingUnavailableError`.
+- **Docs:** the backend README has "Database access and errors" and "Smoke test" sections and an updated directory guide. `map/README.md`'s directory guide is updated. The plan's step 8 notes what was decided. `pyproject.toml` is at `0.12.0`.
+
+**Files changed**
+- `map/backend/src/backend/__init__.py`
+- `map/backend/src/backend/api.py`
+- `map/backend/src/backend/config.py`
+- `map/backend/src/backend/db.py`
+- `map/backend/src/backend/errors.py`
+- `map/backend/scripts/smoke_supabase.py`
+- `map/backend/tests/test_db.py`
+- `map/backend/tests/test_errors.py`
+- `map/backend/pyproject.toml`
+- `map/backend/uv.lock`
+- `map/backend/README.md`
+- `map/README.md`
+- `documentation/map/map_app_plan.md`
+- `documentation/map/CHANGELOG.md`
+
+## 0.11.0 — 2026-11-12
+
+Map commit 7: backend config and dependencies.
+- **Config:** `backend/config.py` adds a frozen `Config` with `supabase_url`, `supabase_key`, and `cache_max_age` (default 300 s), read from `SUPABASE_URL`, `SUPABASE_KEY`, and `CACHE_MAX_AGE`. In development it also loads `map/backend/.env`, and real environment variables win. Missing or blank Supabase settings are allowed, so the app boots and `/api/health` still works.
+- **Refused at startup:** a `CACHE_MAX_AGE` that isn't a whole number of seconds or is negative, a `SUPABASE_URL` without `http(s)://`, and any service-role or secret key (`sb_secret_…`, or a JWT with `role: service_role`). The map backend must only use the anon key.
+- **App factory:** `create_app(config=None)` stores the Config in `app.config["MAP_CONFIG"]`, and `get_config()` returns it. With no Config, it reads the environment.
+- **Dependencies:** added `python-dotenv`, and moved `pytest` into the `dev` group (now 9.2.0). `pyproject.toml` is at `0.11.0` to match this changelog, with a real description.
+- **`.env.example`:** the three variables, with local-stack defaults and a warning to use only the anon key.
+- **Tests:** 29 (from 1). `conftest.py` builds apps with an explicit `Config`, so tests never read a real `.env`. A `clean_env` fixture unsets and restores the variables. New tests cover defaults, whitespace and blanks, validation, accepted and refused keys, `.env` loading with the environment winning, a missing `.env`, and `create_app` with and without a Config. Checked by hand: the dev server starts unconfigured and answers health, and refuses to start with a secret key.
+- **Docs:** `map/backend/README.md` has a Configuration section and an updated directory guide. `map/README.md` has a Configuration section. The plan's step 7 notes what was decided.
+
+**Files changed**
+- `map/backend/src/backend/__init__.py`
+- `map/backend/src/backend/config.py`
+- `map/backend/.env.example`
+- `map/backend/tests/conftest.py`
+- `map/backend/tests/test_config.py`
+- `map/backend/tests/test_health.py`
+- `map/backend/pyproject.toml`
+- `map/backend/uv.lock`
+- `map/backend/README.md`
+- `map/README.md`
+- `documentation/map/map_app_plan.md`
+- `documentation/map/CHANGELOG.md`
+
 ## 0.10.1 — 2026-11-12
 
 `supabase/README.md` now points developers who are new to the database to the new [deployment guide](../deployment_guide.md). That guide is logged in the portal and authentication changelogs.

@@ -209,7 +209,7 @@ map/backend/
 ├── src/backend/
 │   ├── __init__.py          # create_app(), main()
 │   ├── config.py            # env loading
-│   ├── db.py                # Database: Supabase client, rpc(), timeout, UpstreamError, MaskingUnavailable
+│   ├── db.py                # Database: Supabase client, rpc(), timeout, UpstreamError, MaskingUnavailableError
 │   ├── errors.py            # JSON error handlers
 │   ├── api.py               # generic Blueprint routes
 │   └── layers/
@@ -295,11 +295,28 @@ Each step adds its own pgTAP tests.
 - `config.py`: a `Config` dataclass (`SUPABASE_URL`, `SUPABASE_KEY`, `CACHE_MAX_AGE`) loaded from the environment. Missing values do not prevent the app from booting, so `/api/health` still works.
 - `create_app(config=None)`; add `.env.example`.
 
+> **Done (0.11.0).** What the implementation decided:
+> - `Config` is a frozen dataclass with lowercase fields (`supabase_url`, `supabase_key`, `cache_max_age`), read from the three variables. `create_app` stores it in `app.config["MAP_CONFIG"]`, and `backend.get_config()` returns it inside a request. `is_database_configured` tells commit 8 whether to create the `Database`.
+> - `.env` is loaded from the fixed path `map/backend/.env` only when `create_app()` gets no `Config`, and real environment variables win. Tests always pass a `Config`, so a developer's `.env` can't affect them.
+> - **Missing means unset, malformed means refuse.** Blank values count as missing. A non-numeric or negative `CACHE_MAX_AGE`, or a `SUPABASE_URL` without `http(s)://`, stops startup with an error naming the variable.
+> - **Service-role keys are refused.** A `SUPABASE_KEY` starting with `sb_secret_`, or a JWT whose role is `service_role`, stops startup. This enforces the "service-role key is never on this server" decision against a wrong paste into `.env`. The JWT is only decoded, not verified.
+> - `CACHE_MAX_AGE` defaults to 300 seconds. Commit 17 uses it.
+
 **8. Database access, errors, and blueprint — `0.12.0`**
-- `db.py`: a `Database` class wrapping the Supabase client, with `rpc(name, params)` and a request timeout. Supabase failures are raised as `UpstreamError`. The "location masking is not configured" error (`P0001`) is raised as `MaskingUnavailable`. It is created lazily and stored in `app.extensions`.
-- `errors.py`: JSON 400, 404, and 500 responses, with `UpstreamError` → 502 and `MaskingUnavailable` → 503. Details are logged on the server only.
+- `db.py`: a `Database` class wrapping the Supabase client, with `rpc(name, params)` and a request timeout. Supabase failures are raised as `UpstreamError`. The "location masking is not configured" error (`P0001`) is raised as `MaskingUnavailableError`. It is created lazily and stored in `app.extensions`.
+- `errors.py`: JSON 400, 404, and 500 responses, with `UpstreamError` → 502 and `MaskingUnavailableError` → 503. Details are logged on the server only.
 - `api.py`: a Blueprint at `/api`, with `/api/health` moved into it unchanged.
 - `scripts/smoke_supabase.py`: confirms that, with the anon key, `Stations` and `Contacts` **can't** be read and both functions **can** be called.
+
+> **Done (0.12.0).** What the implementation decided or found:
+> - **Exception names end in `Error`** (`MaskingUnavailableError`, plus `DatabaseNotConfiguredError`), as PEP 8 and ruff's N818 require. This plan uses the new names throughout.
+> - **`Database` is a protocol,** and `SupabaseDatabase` implements it. `db.py` is the only module that imports `supabase`. `get_database()` creates the client on first use, behind a lock, and stores it in `app.extensions["map_database"]`. `create_app(config, database=None)` lets tests inject a fake.
+> - **A third error, `DatabaseNotConfiguredError` (503 `database_not_configured`),** covers a data request when `SUPABASE_URL` or `SUPABASE_KEY` isn't set. The app still boots and `/api/health` works.
+> - **Translation, from what supabase-py 2.33 raised against the local stack:** only `APIError` with code `P0001` and the exact masking message becomes `MaskingUnavailableError`. Every other `APIError` (`42501`, `PGRST202`, `22P02`, a bad key) and every `httpx` error (refused, connect or read timeout) becomes `UpstreamError`. The cause is logged, and the exception text stays generic. The timeout is 10 s, via `ClientOptions(postgrest_client_timeout=...)`.
+> - **Error codes:** `bad_request`, `not_found`, `method_not_allowed` (from the HTTP status name), `upstream_error` 502, `masking_unavailable` 503, `database_not_configured` 503, and `internal_error` 500. 5xx messages are fixed sentences. A 400's message comes from `abort(400, description=...)`, so commit 9's filter errors must be safe to show users.
+> - **The smoke script** also checks that `map_stations` returns exactly its seven columns, that `map_filter_options` returns its five lists, and that `mask_point` is unreachable (`PGRST202`). A table read that *succeeds* with zero rows fails, because the grant is the regression even when RLS hides the rows. Locally it passed with both key formats, and it failed as expected after a temporary `grant select on "Stations" to anon`.
+> - The local stack accepted a made-up `sb_publishable_` key. The hosted gateway is expected to reject one, which the smoke script would report as an `UpstreamError`.
+> - **Hosted project (2026-11-12):** the smoke script with the hosted anon key: 5 passed, 0 failed.
 
 **9. Layer framework — `0.13.0`**
 - `layers/base.py`: the `Layer` protocol (`id`, `title`, `default_visible`, `location_note`, `popup_fields`, `filters`, `style_by`, `features(db, filters)`, `detail(db, id)`). A `FilterDef` parses and validates query params, so invalid values return 400. `FilterOption` has optional `implies` and `hint`, and `StyleBy` is optional on a layer.
@@ -307,12 +324,29 @@ Each step adds its own pgTAP tests.
 - Generic routes: `/api/layers`, `/api/layers/<layer>/features`, `/api/layers/<layer>/features/<id>`. An unknown layer returns 404.
 - Tests run entirely against `FakeLayer` and `FakeDatabase`.
 
+> **Done (0.13.0).** What the implementation decided:
+> - **Static and database-backed parts are split.** `filters` (`FilterDef`: key, label, type) and `style_by` (property, label, active_when, fallback_label) are static, so the features route parses query parameters without a database call. A new protocol method, `options(db) -> LayerOptions`, returns each filter's options and the `style_by` values, and is called only when the manifest is built. The stations layer fills both from one `map_filter_options` call. `build_manifest_entry` raises if a layer returns options for an unknown or boolean filter.
+> - **`muted_label`** is on the protocol too (the plan's list left it out), with `location_note`. Unset optional keys (`location_note`, `muted_label`, `style_by`, an option's `implies` and `hint`) are left out of the JSON.
+> - **`features()` returns a list of GeoJSON Features.** The route wraps them in a `FeatureCollection`. `point_feature` and `feature_collection` in `base.py` build both.
+> - **The manifest is `{"layers": [...]}`.** It doesn't touch the database when no layers are registered. With layers but no Supabase settings, it's a 503 `database_not_configured`.
+> - **Filter parsing:**
+>   - Values are ASCII whole-number ids up to the bigint maximum. Larger ones are a 400, not a database 502.
+>   - A multiselect takes repeated or comma-separated values, de-duplicated in order, up to 100.
+>   - A boolean takes `true`/`false`/`1`/`0`.
+>   - A blank value is `None`.
+>   - An unknown parameter, or a single-value filter given twice, is a 400.
+>   - The layer always receives every filter key.
+> - **Feature ids are integers** (`<int:feature_id>`). A non-integer id is a 404, like an unknown feature.
+> - **Registry:** `create_app(config, database, layers)` copies `REGISTRY` (or the given layers) into `app.extensions`. `get_layer` and `get_layers` read it. Duplicate or non-URL-safe ids (lowercase letters, digits, `-`, `_`) stop the app starting.
+> - **Fakes** are in `tests/fakes.py`, not `conftest.py`, because pytest discourages importing from conftest. `FakeLayer` has one filter of each type and a `style_by`.
+> - A throwaway layer over `map_stations` through the real `SupabaseDatabase` on the local stack returned the S5-expected stations for each filter combination.
+
 ### Stations on the map
 
 **10. Stations layer — `0.14.0`**
 - `layers/stations.py`: `features()` calls `db.rpc("map_stations", {})` and turns each row into a feature with `name`, `code`, and `active` (display-ready) properties, `muted` (`true` when `is_active` is `false`), and the masked point. `location_note` is "Approximate location", and `muted_label` is "Inactive".
 - Popup fields: Station, Code, Active. Detail: the same three fields, as one section, from the same function filtered to one id.
-- Add it to `REGISTRY`. Tests use RPC-shaped fixture rows, plus a check that `MaskingUnavailable` from the fake database becomes a 503.
+- Add it to `REGISTRY`. Tests use RPC-shaped fixture rows, plus a check that `MaskingUnavailableError` from the fake database becomes a 503.
 
 **11. Frontend models and API client — `0.15.0`**
 - `core/models.ts` typed to match the API contract, including `FilterOption.implies`, `FilterOption.hint`, and `StyleBy`. `core/map-api.ts` (`health()`, `layers()`, `features(layer, filters)`, `detail(layer, id)`) replaces `services/api.ts`.

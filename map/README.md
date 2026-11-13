@@ -12,7 +12,10 @@
 | Path | Contents |
 | --- | --- |
 | `backend/` | Flask API (uv project). See [backend/README.md](backend/README.md). |
-| `backend/src/backend/` | App source: app factory and routes |
+| `backend/src/backend/` | App source: app factory, settings (`config.py`), routes (`api.py`), database access (`db.py`), and JSON errors (`errors.py`) |
+| `backend/src/backend/layers/` | The layer framework (`base.py`) and the registry of layers the API serves (`__init__.py`) |
+| `backend/scripts/` | `smoke_supabase.py`: checks the anon key's access on a real Supabase project |
+| `backend/.env.example` | Template for the backend's local settings (`.env`) |
 | `backend/tests/` | pytest tests |
 | `frontend/` | Angular + Leaflet app. See [frontend/README.md](frontend/README.md). |
 | `frontend/src/app/map/` | The Leaflet map page |
@@ -52,7 +55,8 @@ One-time setup after cloning:
 ### Troubleshooting
 ...
 ### Configuration
-...
+The backend reads `SUPABASE_URL`, `SUPABASE_KEY` (the anon key only), and `CACHE_MAX_AGE` from the environment or `backend/.env`. It starts without them. See [backend/README.md](backend/README.md#configuration). The frontend needs no configuration: in dev it proxies `/api/*` to the backend.
+
 ### Testing
 ...
 ### Development
