@@ -440,6 +440,7 @@ Each step adds its own pgTAP tests.
 >   - **Scope:** only a select's chosen option implies (a multiselect has no single option). `clearFilters` forgets every record.
 > - **Panel:** picking a project updates the organization dropdown, which stays editable. Each change is one `MapState` update, so `MapView` makes one request with both parameters.
 > - **Checked live** on the local stack: the manifest's project options carry their organizations, and Alpha with Org A → 1 `[1, 3]`, 2 `[2]`.
+> - **Checked by hand in a browser (2026-11-13), steps 13–16:** the filters, role pies, legend, and project → organization behaved as expected.
 
 ### Wrap-up
 
@@ -465,6 +466,7 @@ Each of these becomes its own `1.x` commit, and only touches the files listed.
 | Marker clustering at low zoom | `map/` and `leaflet.markercluster` |
 | Filters in the URL (shareable links) | `map-state.ts` |
 | More layers (sites? projects?) | A Supabase function, `backend/layers/*.py`, `layers/__init__.py` |
+| Style parity with the marine debris map: compare the color palette, fonts, marker look, filter panel and legend styling, and control placement, then align them where it makes sense. Add a link to the marine debris map here when the item is picked up. Keep the role colors colorblind-safe and the popup's "Approximate location" note. | `frontend/src/styles.scss`, `layers/registry.ts`, `layers/markers.ts`, and the component `.scss` files (`filter-panel/`, `legend/`, `status-badge/`, `map/`) |
 
 ## Verification
 

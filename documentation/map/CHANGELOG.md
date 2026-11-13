@@ -3,6 +3,16 @@
 Versioning follows `xx.yy.zz` (see [documentation/CLAUDECODE/CLAUDE.md](../CLAUDECODE/CLAUDE.md)):
 `xx` = major feature, `yy` = steps/commits toward a major feature, `zz` = small updates and revisions.
 
+## 0.20.1 — 2026-11-13
+
+Plan update before the wrap-up.
+- **After 1.0:** added "style parity with the marine debris map". It compares the palette, fonts, marker look, filter panel and legend styling, and control placement, then aligns them, keeping the role colors colorblind-safe. It lists the styling files it would touch. A link to the marine debris map is to be added when the item is picked up.
+- **Verification:** recorded the hand check in a browser of steps 13–16 (filters, role pies, legend, and project → organization), which the automated tests couldn't cover visually.
+
+**Files changed**
+- `documentation/map/map_app_plan.md`
+- `documentation/map/CHANGELOG.md`
+
 ## 0.20.0 — 2026-11-13
 
 Map commit 16: a project selects its managing organization. **Feature:** picking a project shows its stations, colored by the roles of the organization that runs it.
