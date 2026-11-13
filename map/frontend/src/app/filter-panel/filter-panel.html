@@ -19,7 +19,7 @@
                       [value]="option.value"
                       [selected]="selectValue(layer, filter) === '' + option.value"
                     >
-                      {{ option.label }}
+                      {{ optionText(option) }}
                     </option>
                   }
                 </select>
@@ -36,6 +36,9 @@
                       (change)="onTick(layer, filter, option, $event)"
                     />
                     {{ option.label }}
+                    @if (option.hint) {
+                      <span class="hint">{{ option.hint }}</span>
+                    }
                   </label>
                 }
               </fieldset>

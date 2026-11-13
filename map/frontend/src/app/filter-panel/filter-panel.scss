@@ -46,6 +46,15 @@ select {
   font-weight: normal;
 }
 
+.hint {
+  margin-left: 4px;
+  padding: 0 5px;
+  border-radius: 8px;
+  background: #eee;
+  color: #555;
+  font-size: 11px;
+}
+
 .clear {
   padding: 2px 8px;
   font: inherit;

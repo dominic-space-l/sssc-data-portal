@@ -407,6 +407,12 @@ Each step adds its own pgTAP tests.
 - Frontend: the filter panel shows an option's `hint` as a muted tag after its label. When the selected option has a hint and the layer comes back empty, the empty state names it ("No stations are associated with *Snow Survey*").
 - **Feature:** pick a project to see only its stations, and see at a glance which projects have none.
 
+> **Done (0.18.0).** What the implementation decided:
+> - **Backend:** `project` is the first filter. Its options are in `map_filter_options`' name order, and those with `station_count` 0 get `hint: "No stations"`. It's passed as `p_project`, and two values are a 400.
+> - **Hint display:** a native `<option>` can't hold a styled tag, so a dropdown shows "Project Empty — No stations". In a checkbox list, the hint is a muted pill after the label. The select stays native for keyboard and screen-reader support.
+> - **Empty state:** if the selected option of any select filter has a hint, the message names it ("No stations are associated with Project Empty."), even when other filters are also set, because the hint already explains the empty result.
+> - **Checked live** on the local stack: Alpha → 1, 2; Beta → 3; Empty → none, with the hint; Alpha + tide gauge → 2.
+
 **15. Organization filter with role colors — `0.19.0`**
 - Backend: an `organization` select filter, with options from `map_filter_options()` (organizations with at least one role or a project). Passed as `p_organization`, and the rows' `roles` become `properties.roles`. The layer declares `style_by` with the roles from `map_filter_options()` as its values.
 - Frontend: `layers/markers.ts` builds an SVG marker from the `style_by` palette in `registry.ts`, using Okabe–Ito colors in `RoleID` order: a solid circle for one role, and a pie with one equal slice per role for several. Markers with no roles use the fallback gray. Muted markers keep their slices but are greyed out. `legend/` shows the role colors while `style_by.active_when` has a value, plus the `muted_label` entry whenever any muted marker is on the map.

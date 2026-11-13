@@ -13,6 +13,7 @@ Properties of each feature:
     muted    true when the station is inactive, so the map greys it out
 
 Filters (query parameter -> map_stations parameter):
+    project            select      -> p_project (projects with no stations are hinted)
     station_type       multiselect -> p_station_types
     observation_type   multiselect -> p_observation_types
 
@@ -43,10 +44,14 @@ from backend.layers.base import (
 
 MISSING_CODE = "—"
 
+# Shown after a project's name in the filter when it has no stations.
+NO_STATIONS_HINT = "No stations"
+
 _ACTIVE_LABELS = {True: "Yes", False: "No", None: "Unknown"}
 
 # The map_stations parameter each filter is passed as.
 _RPC_PARAMS = {
+    "project": "p_project",
     "station_type": "p_station_types",
     "observation_type": "p_observation_types",
 }
@@ -67,8 +72,33 @@ def _id_name_options(items: Sequence[Mapping[str, Any]]) -> list[FilterOption]:
     return [FilterOption(item["id"], item["name"]) for item in items]
 
 
+def _project_options(projects: Sequence[Mapping[str, Any]]) -> list[FilterOption]:
+    """Turns map_filter_options projects into options, hinting those with no stations.
+
+    Args:
+        projects: ``[{"id", "name", "organization_id", "station_count"}, ...]``, sorted
+            by name.
+
+    Returns:
+        One option per project, in the same order. Projects with a station count of
+        0 get the hint "No stations".
+
+    Usage:
+        _project_options(options["projects"])
+    """
+    return [
+        FilterOption(
+            project["id"],
+            project["name"],
+            hint=NO_STATIONS_HINT if project["station_count"] == 0 else None,
+        )
+        for project in projects
+    ]
+
+
 # How each filter's options are built from the map_filter_options result.
 _OPTION_BUILDERS: dict[str, Callable[[Mapping[str, Any]], list[FilterOption]]] = {
+    "project": lambda options: _project_options(options["projects"]),
     "station_type": lambda options: _id_name_options(options["station_types"]),
     "observation_type": lambda options: _id_name_options(options["observation_types"]),
 }
@@ -93,6 +123,7 @@ class StationsLayer:
         PopupField("active", "Active"),
     )
     filters = (
+        FilterDef("project", "Project", FilterType.SELECT),
         FilterDef("station_type", "Station type", FilterType.MULTISELECT),
         FilterDef("observation_type", "Observes", FilterType.MULTISELECT),
     )

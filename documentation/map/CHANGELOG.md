@@ -3,6 +3,29 @@
 Versioning follows `xx.yy.zz` (see [documentation/CLAUDECODE/CLAUDE.md](../CLAUDECODE/CLAUDE.md)):
 `xx` = major feature, `yy` = steps/commits toward a major feature, `zz` = small updates and revisions.
 
+## 0.18.0 — 2026-11-13
+
+Map commit 14: project filter. **Feature:** pick a project to see only its stations, and see at a glance which projects have none.
+- **Backend:** a `project` select filter, listed first, with every project by name. Projects with no stations carry `hint: "No stations"`. The value is passed as `p_project`.
+- **Frontend:** the filter panel shows an option's hint after its label: "Project Empty — No stations" in a dropdown, and a muted tag in a checkbox list. When the selected project has a hint and no stations come back, the map says "No stations are associated with Project Empty."
+- **Tests:** 146 backend (from 143): the project parameter, hinted options, and a single value only. 56 frontend (from 54): hint display in both control types, and the hinted empty message.
+- **Checked live** against the local stack: each project returned its seed stations, and the empty project has the hint.
+
+**Files changed**
+- `map/backend/src/backend/layers/stations.py`
+- `map/backend/tests/test_stations.py`
+- `map/backend/pyproject.toml`
+- `map/backend/uv.lock`
+- `map/backend/README.md`
+- `map/frontend/src/app/filter-panel/filter-panel.ts`
+- `map/frontend/src/app/filter-panel/filter-panel.html`
+- `map/frontend/src/app/filter-panel/filter-panel.scss`
+- `map/frontend/src/app/filter-panel/filter-panel.spec.ts`
+- `map/frontend/src/app/map/empty-message.ts`
+- `map/frontend/src/app/map/empty-message.spec.ts`
+- `documentation/map/map_app_plan.md`
+- `documentation/map/CHANGELOG.md`
+
 ## 0.17.0 — 2026-11-13
 
 Map commit 13: station type and observation type filters. **Feature:** filter stations by type and by what they observe.

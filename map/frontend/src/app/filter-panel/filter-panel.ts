@@ -4,7 +4,9 @@
  * Generic: it renders whatever `FilterDef`s the backend sends and knows no layer or
  * filter by name. A `boolean` is a checkbox (checked means true, unchecked means no
  * filter), a `select` is a dropdown with an "All" entry, and a `multiselect` is a list
- * of checkboxes. Values go to `MapState`, which makes `MapView` redraw the layer.
+ * of checkboxes. An option's `hint` (such as "No stations") follows its label: after a
+ * dash in a dropdown, and as a muted tag in a checkbox list. Values go to `MapState`,
+ * which makes `MapView` redraw the layer.
  *
  * Usage: `<map-filter-panel />` (MapView places it over the map).
  */
@@ -36,6 +38,17 @@ export class FilterPanel {
    */
   protected valueOf(layer: LayerManifest, filter: FilterDef): FilterValue {
     return this.state.filtersFor(layer.id)[filter.key] ?? null;
+  }
+
+  /**
+   * Returns a dropdown option's text. A native `<option>` can't hold a styled tag, so
+   * the hint follows the label after a dash.
+   *
+   * @param option The option.
+   * @return "Label" or "Label — Hint".
+   */
+  protected optionText(option: FilterOption): string {
+    return option.hint ? `${option.label} — ${option.hint}` : option.label;
   }
 
   /**

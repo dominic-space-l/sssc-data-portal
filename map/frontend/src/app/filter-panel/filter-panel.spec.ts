@@ -28,7 +28,7 @@ const LAYER: LayerManifest = {
       type: 'select',
       options: [
         { value: 1, label: 'Project Alpha' },
-        { value: 3, label: 'Project Empty' },
+        { value: 3, label: 'Project Empty', hint: 'No stations' },
       ],
     },
     {
@@ -37,7 +37,7 @@ const LAYER: LayerManifest = {
       type: 'multiselect',
       options: [
         { value: 2, label: 'Tide gauge' },
-        { value: 1, label: 'Weather station' },
+        { value: 1, label: 'Weather station', hint: 'Retired' },
       ],
     },
     { key: 'live', label: 'Live only', type: 'boolean' },
@@ -96,7 +96,7 @@ describe('FilterPanel', () => {
     expect([...select.options].map((o) => o.textContent!.trim())).toEqual([
       'All',
       'Project Alpha',
-      'Project Empty',
+      'Project Empty — No stations',
     ]);
     expect(all(fixture, 'legend')[0].textContent).toBe('Station type');
     expect(all(fixture, 'fieldset input[type=checkbox]').length).toBe(2);
@@ -153,7 +153,7 @@ describe('FilterPanel', () => {
     await fixture.whenStable();
 
     const select = all<HTMLSelectElement>(fixture, 'select')[0];
-    expect(select.selectedOptions[0].textContent!.trim()).toBe('Project Empty');
+    expect(select.selectedOptions[0].textContent!.trim()).toBe('Project Empty — No stations');
     expect(all<HTMLInputElement>(fixture, 'fieldset input').map((i) => i.checked)).toEqual([
       false,
       true,
@@ -171,6 +171,12 @@ describe('FilterPanel', () => {
 
     expect(state.filtersFor('stations')).toEqual({});
     expect(all(fixture, 'button.clear')).toEqual([]);
+  });
+
+  it('shows an option hint as a tag in a checkbox list', async () => {
+    const { fixture } = await render();
+    const tags = all(fixture, 'fieldset .hint').map((el) => el.textContent);
+    expect(tags).toEqual(['Retired']);
   });
 
   it('renders nothing when no visible layer has filters', async () => {

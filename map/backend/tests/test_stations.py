@@ -203,8 +203,19 @@ def test_database_failures_are_not_coordinates(error, status, code):
             {"p_station_types": [1], "p_observation_types": [2]},
         ),
         ("?station_type=&observation_type=", {}),
+        ("?project=3", {"p_project": 3}),
+        ("?project=1&station_type=2", {"p_project": 1, "p_station_types": [2]}),
     ],
-    ids=["none", "one-type", "two-types", "observations", "both", "blank"],
+    ids=[
+        "none",
+        "one-type",
+        "two-types",
+        "observations",
+        "both",
+        "blank",
+        "project",
+        "project+type",
+    ],
 )
 def test_filters_become_map_stations_params(query, params):
     """Each set filter is passed as its map_stations parameter. Unset ones aren't sent.
@@ -290,6 +301,16 @@ def test_manifest_filters_come_from_map_filter_options():
     assert calls == [("map_filter_options", {})]
     assert entry["filters"] == [
         {
+            "key": "project",
+            "label": "Project",
+            "type": "select",
+            "options": [
+                {"value": 1, "label": "Project Alpha"},
+                {"value": 2, "label": "Project Beta"},
+                {"value": 3, "label": "Project Empty", "hint": "No stations"},
+            ],
+        },
+        {
             "key": "station_type",
             "label": "Station type",
             "type": "multiselect",
@@ -309,6 +330,18 @@ def test_manifest_filters_come_from_map_filter_options():
             ],
         },
     ]
+
+
+def test_project_select_takes_one_project():
+    """Project is a single-value filter: two projects is a 400.
+
+    Usage:
+        uv run pytest -k takes_one_project
+    """
+    db = FakeDatabase({"map_stations": ROWS})
+    response = _client(db).get("/api/layers/stations/features?project=1&project=2")
+    assert response.status_code == 400
+    assert db.calls == []
 
 
 # ---------------------------------------------------------------------------------------
