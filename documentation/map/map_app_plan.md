@@ -475,6 +475,24 @@ Each step adds its own pgTAP tests.
 - `documentation/map/adding_a_layer.md`: a step-by-step guide to adding a layer or changing its fields, filters, and colors, including how to source points from a masking function.
 - Fill in `map/README.md` (configuration, testing, smoke script) and `documentation/CLAUDECODE/map_context.md` (layout, layer conventions, the masking rules, no contact data).
 
+> **Done (1.0.0).** What the implementation decided:
+> - **`api.md`** documents the contract as built, not as first planned:
+>   - routes and which responses are cached
+>   - the stations manifest at 1.0, and filter types with their query encodings and 400 rules
+>   - `implies` (select options only, undone unless the user has taken the value over) and `hint` (with the empty-state wording)
+>   - `style_by`, feature properties, and detail
+>   - every error code
+>   - the six masking guarantees, with how to check them
+> - **`adding_a_layer.md`** has a "what to change" table, then guides for changing fields, filters, and colors, then adding a layer end to end:
+>   - a masking database function modelled on `map_stations`, with the anon allowlist and pgTAP tests
+>   - the backend layer module, registering it, and tests with `FakeDatabase`
+>   - optional frontend styling, and checks against a real database
+>
+>   It also notes a design point for a second masked layer: `mask_point`'s offset depends only on the id, so two layers with overlapping ids at the same spot would be offset identically.
+> - **`map/README.md`** has every section filled in. Overview, Architecture, a Troubleshooting table (each error message and its fix), Testing (unit, integration, smoke, coordinate check), and Development are new. The Quickstart now includes the local database and `.env`.
+> - **`CLAUDECODE/map_context.md`**: the six rules that must not be broken, the layout, conventions, and gotchas, for coding agents.
+> - **Before tagging 1.0:** the Verification list asks for `pytest -m integration` and the coordinate check "with real credentials". Both passed against the local stack (7/7, and 10/10 with offsets of 271–348 m). The run against the hosted project is for the maintainer, since it needs the hosted service-role key.
+
 ## After 1.0
 
 Each of these becomes its own `1.x` commit, and only touches the files listed.

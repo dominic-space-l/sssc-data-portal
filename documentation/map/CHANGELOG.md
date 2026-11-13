@@ -3,6 +3,28 @@
 Versioning follows `xx.yy.zz` (see [documentation/CLAUDECODE/CLAUDE.md](../CLAUDECODE/CLAUDE.md)):
 `xx` = major feature, `yy` = steps/commits toward a major feature, `zz` = small updates and revisions.
 
+## 1.0.0 — 2026-11-13
+
+Map commit 18: documentation, and the **1.0 release** of the public map. Stations at masked locations, with popups, four filters (project, organization, station type, observation type), role colors and a legend, error and empty states, caching, and the database's privacy guarantees.
+- **`documentation/map/api.md`:** the API contract as built: routes and caching, the manifest (filters, `implies`, `hint`, `style_by`), features, detail, every error code, and the masking guarantees with how to check them.
+- **`documentation/map/adding_a_layer.md`:** how to change a layer's fields, filters, and colors, and how to add a layer end to end: the masking database function, the anon allowlist and pgTAP tests, the backend module, the registry, tests, optional styling, and checks against a real database.
+- **`map/README.md`:** every section filled in, with Overview, Architecture, Troubleshooting (each error message and its fix), Testing (unit, integration, smoke script, coordinate check), and Development. The Quickstart now includes the local database and `.env` setup.
+- **`documentation/CLAUDECODE/map_context.md`:** context for coding agents: the rules that must not be broken (masking, anon key only, no contact data, fail closed), the layout, conventions, and gotchas.
+- **`documentation/README.md`:** its directory guide points to the new map docs.
+- **`pyproject.toml`** is at `1.0.0`.
+- **Verification before 1.0:** the unit tests (161 backend, 89 frontend), lint, and build pass. The integration tests (7/7) and the coordinate check (10/10, offsets 271–348 m) pass against the local stack. Running them against the hosted project is left to the maintainer, since it needs the hosted service-role key.
+
+**Files changed**
+- `documentation/map/api.md`
+- `documentation/map/adding_a_layer.md`
+- `documentation/CLAUDECODE/map_context.md`
+- `documentation/README.md`
+- `map/README.md`
+- `map/backend/pyproject.toml`
+- `map/backend/uv.lock`
+- `documentation/map/map_app_plan.md`
+- `documentation/map/CHANGELOG.md`
+
 ## 0.21.0 — 2026-11-13
 
 Map commit 17: hardening.

@@ -16,7 +16,7 @@ None. Everything here is Markdown.
 | --- | --- |
 | `deployment_guide.md` | How database changes are developed, tested, and deployed to the hosted Supabase project (for portal and authentication developers) |
 | `CLAUDECODE/` | Rules (`CLAUDE.md`) and per-section context files for AI coding agents |
-| `map/` | Map changelog and plans |
+| `map/` | Map changelog and plans, the API contract (`api.md`), and the guide to adding or changing a layer (`adding_a_layer.md`) |
 | `portal/` | Portal changelog and plans |
 | `authentication/` | Authentication changelog and plans |
 
