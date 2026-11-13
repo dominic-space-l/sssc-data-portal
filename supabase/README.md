@@ -2,7 +2,7 @@
 
 The database for the whole project. This folder holds the Supabase CLI project: the local stack config, the versioned schema migrations, local seed data, and pgTAP tests. The hosted Supabase project is the source of truth for data. This folder is the source of truth for **schema and access rules**.
 
-The plan for this folder is [documentation/map/supabase_plan.md](../documentation/map/supabase_plan.md), and changes are logged in the [map changelog](../documentation/map/CHANGELOG.md).
+The plan for this folder is [documentation/map/supabase_plan.md](../documentation/map/supabase_plan.md), and changes are logged in the [map changelog](../documentation/map/CHANGELOG.md). New to working on the database, for example from the portal or authentication side? Start with the [deployment guide](../documentation/deployment_guide.md).
 
 ## Quickstart
 

@@ -3,6 +3,14 @@
 Versioning follows `xx.yy.zz` (see [documentation/CLAUDECODE/CLAUDE.md](../CLAUDECODE/CLAUDE.md)):
 `xx` = major feature, `yy` = steps/commits toward a major feature, `zz` = small updates and revisions.
 
+## 0.10.1 — 2026-11-12
+
+`supabase/README.md` now points developers who are new to the database to the new [deployment guide](../deployment_guide.md). That guide is logged in the portal and authentication changelogs.
+
+**Files changed**
+- `supabase/README.md`
+- `documentation/map/CHANGELOG.md`
+
 ## 0.10.0 — 2026-11-12
 
 Supabase step S7: deploy and drift-check workflows. Merging to `main` and approving the deploy is now the only path for schema changes to reach the hosted database.
