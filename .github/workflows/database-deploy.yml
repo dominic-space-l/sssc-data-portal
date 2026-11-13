@@ -1,0 +1,148 @@
+# Database deploy: push merged migrations to the hosted Supabase project, after approval.
+#
+# Role: step S7 of documentation/map/supabase_plan.md. This is the only path for schema
+# changes to reach the hosted database. It runs after the Database workflow (tests,
+# lint, advisors) passes for a push to main, and deploys the exact commit that passed:
+#   plan    (environment supabase-readonly, no approval) dry-runs the push as the
+#           read-only ci_drift_check role and lists the pending migrations in the job
+#           summary. If nothing is pending, deploy is skipped.
+#   deploy  (environment supabase-production, waits for a required reviewer) pushes the
+#           migrations, checks the migration history matches, and runs the security
+#           advisors against the hosted database.
+# Every CLI call passes --remote=<url> and its JSON output must name a non-local
+# database as the target (.github/scripts/supabase_ci.mjs), so nothing can quietly hit
+# a database on the runner. The seed (--include-seed), --include-all, custom roles,
+# and Vault secrets (--skip-vault) are never pushed.
+#
+# Usage: merge a PR that changes supabase/migrations/ into main, wait for the Database
+# workflow, then approve the "Deploy" job under Actions -> Database deploy. To retry a
+# deploy, re-run this workflow's failed jobs, or run the Database workflow on main
+# (Actions -> Database -> Run workflow), which triggers this one again when it passes.
+# Setup (environments, secrets, the read-only role): supabase/README.md.
+
+name: Database deploy
+
+on:
+  workflow_run:
+    workflows: [Database]
+    types: [completed]
+    branches: [main]
+
+# One deploy at a time, and a queued one is never cancelled halfway.
+concurrency:
+  group: database-deploy
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  plan:
+    name: Plan (dry run)
+    # Only a passing Database run on main in this repo. A pull request from a fork whose
+    # branch happens to be named main also matches `branches`, so check the event too.
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.head_branch == 'main' &&
+      contains(fromJSON('["push", "workflow_dispatch"]'), github.event.workflow_run.event) &&
+      github.event.workflow_run.head_repository.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: supabase-readonly
+    env:
+      SUPABASE_PROJECT_ID: ${{ vars.SUPABASE_PROJECT_ID }}
+    outputs:
+      pending: ${{ steps.plan.outputs.pending }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Use pinned npm version
+        run: npm install -g npm@11.19.0
+
+      # Installs the Supabase CLI at the version pinned in package-lock.json. Secrets are
+      # set only on the steps below, so install scripts never see them.
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Check the database URL
+        env:
+          SUPABASE_READONLY_DB_URL: ${{ secrets.SUPABASE_READONLY_DB_URL }}
+        run: node .github/scripts/supabase_ci.mjs check-url SUPABASE_READONLY_DB_URL
+
+      - name: List pending migrations
+        id: plan
+        env:
+          SUPABASE_READONLY_DB_URL: ${{ secrets.SUPABASE_READONLY_DB_URL }}
+          PGSSLMODE: require
+        run: |
+          npx supabase db push --remote="$SUPABASE_READONLY_DB_URL" --dry-run --skip-vault \
+            --output-format json | tee plan.json
+          node .github/scripts/supabase_ci.mjs plan plan.json
+
+  deploy:
+    name: Deploy
+    needs: plan
+    if: needs.plan.outputs.pending == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # Pauses here until a required reviewer approves.
+    environment: supabase-production
+    env:
+      SUPABASE_PROJECT_ID: ${{ vars.SUPABASE_PROJECT_ID }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Use pinned npm version
+        run: npm install -g npm@11.19.0
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Check the database URL
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: node .github/scripts/supabase_ci.mjs check-url SUPABASE_DB_URL
+
+      - name: Push migrations
+        id: push
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          PGSSLMODE: require
+        run: |
+          npx supabase db push --remote="$SUPABASE_DB_URL" --skip-vault --yes \
+            --output-format json | tee push.json
+          node .github/scripts/supabase_ci.mjs pushed push.json
+
+      - name: Check migration history
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          PGSSLMODE: require
+        run: |
+          npx supabase migration list --remote="$SUPABASE_DB_URL" \
+            --output-format json | tee history.json
+          node .github/scripts/supabase_ci.mjs history history.json
+
+      # Runs even if the history check failed, so the summary shows both.
+      - name: Security advisors
+        if: ${{ !cancelled() && steps.push.outcome == 'success' }}
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          PGSSLMODE: require
+        run: |
+          npx supabase db advisors --remote="$SUPABASE_DB_URL" --type security --fail-on none \
+            --output-format json | tee advisors.json
+          node .github/scripts/supabase_ci.mjs advisors advisors.json

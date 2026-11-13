@@ -3,6 +3,27 @@
 Versioning follows `xx.yy.zz` (see [documentation/CLAUDECODE/CLAUDE.md](../CLAUDECODE/CLAUDE.md)):
 `xx` = major feature, `yy` = steps/commits toward a major feature, `zz` = small updates and revisions.
 
+## 0.10.0 — 2026-11-12
+
+Supabase step S7: deploy and drift-check workflows. Merging to `main` and approving the deploy is now the only path for schema changes to reach the hosted database.
+- **Deploy (`database-deploy.yml`):** runs after the `Database` workflow passes for a push to `main`, on the commit that passed. **Plan** dry-runs the push and lists the pending migrations in the job summary, and stops if none are pending. **Deploy** waits for approval in the `supabase-production` environment. It then pushes the migrations, checks that every migration is on both sides, and runs the security advisors against the hosted database. One deploy runs at a time. It never pushes the seed, `--include-all`, custom roles, or Vault secrets (`--skip-vault`).
+- **Drift check (`database-drift.yml`):** nightly at 10:17 UTC, and by hand. It fails if the migration history differs, if the hosted `public` or `map_private` schema differs from the migrations (a non-empty `db diff`), or if a security advisor reports an error. The summary shows the drift SQL and the advisor findings.
+- **Guards (`.github/scripts/supabase_ci.mjs`):** before each job, checks that the database URL belongs to the project in `SUPABASE_PROJECT_ID` and isn't local. After each command, it checks that the CLI reports the hosted database as its target, then writes the summary and decides pass or fail.
+- **Fewer, smaller secrets than the plan:** no Supabase access token. Every command connects with a database URL, so neither workflow runs `supabase link`. Drift checks and the deploy's dry run connect as `ci_drift_check`, a role that can read the catalog and the migration history but no table data, and can't write. The plan had `pg_read_all_data`, which can read every row. Hosted connections require TLS. Secrets are set only on the steps that use them.
+- **Checked locally with CLI 3.1.0:** URL targets, the JSON output of each command, `db diff` exiting 0 on drift (hence the script's check), the role's access, and `PGSSLMODE`.
+- **Hosted setup (done 2026-11-12):** `ci_drift_check` was created on the hosted project, and its privileges were confirmed from the catalog. The Session pooler accepts it over TLS. Both GitHub environments were set up. Run by hand as `ci_drift_check` before merging, the schema diff found no differences and the advisors reported no errors.
+- **Docs:** `supabase/README.md` now has the environments, the role, the merge-and-approve workflow, fixing drift, and restoring from backups, and no longer says to push from a laptop. Marked S7 done in the plan. S7 took `0.10.0`, so map commits 7–17 in `map_app_plan.md` each moved up one `yy` (`0.11.0`–`0.21.0`). Added `.github/` to the root README's directory guide.
+
+**Files changed**
+- `.github/workflows/database-deploy.yml`
+- `.github/workflows/database-drift.yml`
+- `.github/scripts/supabase_ci.mjs`
+- `supabase/README.md`
+- `README.md`
+- `documentation/map/supabase_plan.md`
+- `documentation/map/map_app_plan.md`
+- `documentation/map/CHANGELOG.md`
+
 ## 0.9.0 — 2026-11-12
 
 Supabase step S6: `public.map_filter_options`, the options for the public map's filter dropdowns.

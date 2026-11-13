@@ -44,5 +44,7 @@ For details, see each section's README ([map](map/README.md), [portal](portal/RE
 | `portal/frontend/` | Angular web portal |
 | `authentication/` | Authentication system |
 | `supabase/` | Supabase CLI project: config, schema migrations, seed data, and pgTAP tests |
+| `.github/workflows/` | CI (`ci.yml`), database tests (`database.yml`), and the hosted database's gated deploy and nightly drift check (`database-deploy.yml`, `database-drift.yml`; see [supabase/README.md](supabase/README.md#deploy-and-drift-check-workflows)) |
+| `.github/scripts/` | Helpers for those workflows |
 | `documentation/` | Project docs and AI agent context |
 | `pre_development/` | Database schema drafts (historical) |

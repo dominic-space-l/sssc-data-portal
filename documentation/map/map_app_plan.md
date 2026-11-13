@@ -286,22 +286,22 @@ The Supabase steps (1–6) and the backend foundation (7–9) don't depend on ea
 
 Each step adds its own pgTAP tests.
 
-**S7. Deploy and drift-check workflows — next free `yy`:** a gated `supabase db push` on merge to `main`, plus a nightly read-only drift check against the hosted project. It can land any time after S3 and must land before commit 10.
+**S7. Deploy and drift-check workflows — `0.10.0`:** a gated `supabase db push` on merge to `main`, plus a nightly read-only drift check against the hosted project. It landed after S6, so commits 7–17 below each moved up one `yy`.
 
 ### Backend foundation
 
-**7. Config and dependencies — `0.10.0`**
+**7. Config and dependencies — `0.11.0`**
 - Add `python-dotenv`, and move `pytest` into a `dev` dependency group.
 - `config.py`: a `Config` dataclass (`SUPABASE_URL`, `SUPABASE_KEY`, `CACHE_MAX_AGE`) loaded from the environment. Missing values do not prevent the app from booting, so `/api/health` still works.
 - `create_app(config=None)`; add `.env.example`.
 
-**8. Database access, errors, and blueprint — `0.11.0`**
+**8. Database access, errors, and blueprint — `0.12.0`**
 - `db.py`: a `Database` class wrapping the Supabase client, with `rpc(name, params)` and a request timeout. Supabase failures are raised as `UpstreamError`. The "location masking is not configured" error (`P0001`) is raised as `MaskingUnavailable`. It is created lazily and stored in `app.extensions`.
 - `errors.py`: JSON 400, 404, and 500 responses, with `UpstreamError` → 502 and `MaskingUnavailable` → 503. Details are logged on the server only.
 - `api.py`: a Blueprint at `/api`, with `/api/health` moved into it unchanged.
 - `scripts/smoke_supabase.py`: confirms that, with the anon key, `Stations` and `Contacts` **can't** be read and both functions **can** be called.
 
-**9. Layer framework — `0.12.0`**
+**9. Layer framework — `0.13.0`**
 - `layers/base.py`: the `Layer` protocol (`id`, `title`, `default_visible`, `location_note`, `popup_fields`, `filters`, `style_by`, `features(db, filters)`, `detail(db, id)`). A `FilterDef` parses and validates query params, so invalid values return 400. `FilterOption` has optional `implies` and `hint`, and `StyleBy` is optional on a layer.
 - `layers/__init__.py`: an empty `REGISTRY` plus `get_layer(id)`.
 - Generic routes: `/api/layers`, `/api/layers/<layer>/features`, `/api/layers/<layer>/features/<id>`. An unknown layer returns 404.
@@ -309,16 +309,16 @@ Each step adds its own pgTAP tests.
 
 ### Stations on the map
 
-**10. Stations layer — `0.13.0`**
+**10. Stations layer — `0.14.0`**
 - `layers/stations.py`: `features()` calls `db.rpc("map_stations", {})` and turns each row into a feature with `name`, `code`, and `active` (display-ready) properties, `muted` (`true` when `is_active` is `false`), and the masked point. `location_note` is "Approximate location", and `muted_label` is "Inactive".
 - Popup fields: Station, Code, Active. Detail: the same three fields, as one section, from the same function filtered to one id.
 - Add it to `REGISTRY`. Tests use RPC-shaped fixture rows, plus a check that `MaskingUnavailable` from the fake database becomes a 503.
 
-**11. Frontend models and API client — `0.14.0`**
+**11. Frontend models and API client — `0.15.0`**
 - `core/models.ts` typed to match the API contract, including `FilterOption.implies`, `FilterOption.hint`, and `StyleBy`. `core/map-api.ts` (`health()`, `layers()`, `features(layer, filters)`, `detail(layer, id)`) replaces `services/api.ts`.
 - Tests with `HttpTestingController`.
 
-**12. Station waypoints and popups — `0.15.0`**
+**12. Station waypoints and popups — `0.16.0`**
 - `core/map-state.ts`: signals for the manifest, per-layer filter values, and loading/error state.
 - `MapView`: loads the manifest, then draws each `default_visible` layer with `L.geoJSON`, using `layers/registry.ts` styles (or a default) and the marker factory in `layers/markers.ts`. Clicking a marker opens a popup built from `popup_fields`, plus `location_note`. Markers with `muted: true` are drawn greyed out (reduced opacity, gray outline). `maxZoom` is capped at 14.
 - Remove the placeholder Sitka marker, and pull the status badge out into `status-badge/`.
@@ -326,30 +326,30 @@ Each step adds its own pgTAP tests.
 
 ### Filtering and coloring
 
-**13. Station type and observation type filters — `0.16.0`**
+**13. Station type and observation type filters — `0.17.0`**
 - Backend: `station_type` and `observation_type` multiselect filters on the stations layer. Options come from `map_filter_options()`. The selected values are passed as `p_station_types` and `p_observation_types`, or `null` when none are ticked.
 - Frontend: `filter-panel/` renders a control for each `FilterDef` by type (`boolean` → checkbox, `select` → dropdown with an "All" entry, `multiselect` → checkbox list) and writes values to `MapState`. `MapView` redraws the layer when its filters change. The panel is generic, with no layer ids in its code.
 - `MapView` shows an empty state when the layer returns no features ("No stations match these filters").
 - **Feature:** filter stations by type and by what they observe.
 
-**14. Project filter — `0.17.0`**
+**14. Project filter — `0.18.0`**
 - Backend: a `project` select filter with every project as an option, sorted by name. Projects whose station count is 0 get `hint: "No stations"`. Passed as `p_project`.
 - Frontend: the filter panel shows an option's `hint` as a muted tag after its label. When the selected option has a hint and the layer comes back empty, the empty state names it ("No stations are associated with *Snow Survey*").
 - **Feature:** pick a project to see only its stations, and see at a glance which projects have none.
 
-**15. Organization filter with role colors — `0.18.0`**
+**15. Organization filter with role colors — `0.19.0`**
 - Backend: an `organization` select filter, with options from `map_filter_options()` (organizations with at least one role or a project). Passed as `p_organization`, and the rows' `roles` become `properties.roles`. The layer declares `style_by` with the roles from `map_filter_options()` as its values.
 - Frontend: `layers/markers.ts` builds an SVG marker from the `style_by` palette in `registry.ts`, using Okabe–Ito colors in `RoleID` order: a solid circle for one role, and a pie with one equal slice per role for several. Markers with no roles use the fallback gray. Muted markers keep their slices but are greyed out. `legend/` shows the role colors while `style_by.active_when` has a value, plus the `muted_label` entry whenever any muted marker is on the map.
 - **Feature:** pick an organization to see its stations, colored by its role at each one.
 
-**16. Project selects its managing organization — `0.19.0`**
+**16. Project selects its managing organization — `0.20.0`**
 - Backend: each project option `implies` its `organization_id`. `map_stations()` already applies the rule that a project turns the organization into colors only. A test checks that both parameters are passed together.
 - Frontend: `MapState.setFilter` applies `implies` and records which values it set. Clearing the project clears values it implied, unless the user has since changed them. The organization dropdown stays editable.
 - **Feature:** picking a project shows its stations, colored by the roles of the organization that runs it.
 
 ### Wrap-up
 
-**17. Hardening — `0.20.0`**
+**17. Hardening — `0.21.0`**
 - Backend: a `Cache-Control` header on the layer routes (masked output is stable, so it caches well), request logging, and integration tests (`@pytest.mark.integration`).
 - `smoke_supabase.py`: run with a service-role key supplied on the command line (never stored in config), it checks that no point from the live features route matches a true station location to 4 decimal places, and that every point is 250–500 m from its station.
 - Frontend: a visible error state when the backend is down, a layer fails to load, or masking isn't configured (503).
