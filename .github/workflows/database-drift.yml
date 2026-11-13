@@ -1,0 +1,97 @@
+# Database drift check: compare the hosted Supabase project with the repo, nightly.
+#
+# Role: step S7 of documentation/map/supabase_plan.md. It catches the hosted database
+# drifting from supabase/migrations/: a table, grant, or policy edited in the dashboard,
+# a migration pushed but never merged, or one merged but never deployed. After S3 that
+# matters most for access rules: a dashboard edit that gives anon a grant or a policy
+# would otherwise go unnoticed. Three checks, each failing the job, all reported in the
+# job summary:
+#   1. Migration history: every migration is both in the repo and on the hosted database.
+#   2. Schema: builds the migrations in a shadow database on the runner (Docker) and
+#      diffs it against the hosted public and map_private schemas. Any SQL fails.
+#   3. Security advisors: any ERROR-level finding (for example a table without RLS).
+# It connects only as ci_drift_check, a role that can read the catalog and the migration
+# history but no table data, and it never writes. No Supabase access token is needed.
+#
+# Usage: runs nightly; run it by hand under Actions -> Database drift -> Run workflow.
+# GitHub emails whoever last changed the schedule below when a scheduled run fails, and
+# disables the schedule after 60 days with no repository activity. To fix drift, see
+# "Drift" in supabase/README.md. Setup (environment, secret, role): supabase/README.md.
+
+name: Database drift
+
+on:
+  schedule:
+    - cron: "17 10 * * *" # 10:17 UTC, around 1-2 a.m. in Sitka
+  workflow_dispatch:
+
+concurrency:
+  group: database-drift
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  drift:
+    name: Hosted database matches the repo
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: supabase-readonly
+    env:
+      SUPABASE_PROJECT_ID: ${{ vars.SUPABASE_PROJECT_ID }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Use pinned npm version
+        run: npm install -g npm@11.19.0
+
+      # Installs the Supabase CLI at the version pinned in package-lock.json. Secrets are
+      # set only on the steps below, so install scripts never see them.
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Check the database URL
+        id: url
+        env:
+          SUPABASE_READONLY_DB_URL: ${{ secrets.SUPABASE_READONLY_DB_URL }}
+        run: node .github/scripts/supabase_ci.mjs check-url SUPABASE_READONLY_DB_URL
+
+      # Each check runs even if an earlier one failed, so the summary shows all three.
+      - name: Migration history
+        if: ${{ !cancelled() && steps.url.outcome == 'success' }}
+        env:
+          SUPABASE_READONLY_DB_URL: ${{ secrets.SUPABASE_READONLY_DB_URL }}
+          PGSSLMODE: require
+        run: |
+          npx supabase migration list --remote="$SUPABASE_READONLY_DB_URL" \
+            --output-format json | tee history.json
+          node .github/scripts/supabase_ci.mjs history history.json
+
+      # db diff exits 0 even when it finds drift, so the script fails on any SQL instead.
+      # Add each new schema we own here, as in database.yml and the db:lint script.
+      # No PGSSLMODE here: the diff also connects to its shadow database on the runner,
+      # which has no TLS. The CLI still tries TLS first for the hosted database.
+      - name: Schema
+        if: ${{ !cancelled() && steps.url.outcome == 'success' }}
+        env:
+          SUPABASE_READONLY_DB_URL: ${{ secrets.SUPABASE_READONLY_DB_URL }}
+        run: |
+          npx supabase db diff --from migrations --to "$SUPABASE_READONLY_DB_URL" \
+            --schema public,map_private --output-format json | tee diff.json
+          node .github/scripts/supabase_ci.mjs diff diff.json
+
+      - name: Security advisors
+        if: ${{ !cancelled() && steps.url.outcome == 'success' }}
+        env:
+          SUPABASE_READONLY_DB_URL: ${{ secrets.SUPABASE_READONLY_DB_URL }}
+          PGSSLMODE: require
+        run: |
+          npx supabase db advisors --remote="$SUPABASE_READONLY_DB_URL" --type security \
+            --fail-on none --output-format json | tee advisors.json
+          node .github/scripts/supabase_ci.mjs advisors advisors.json

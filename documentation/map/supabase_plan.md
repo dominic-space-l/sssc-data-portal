@@ -447,7 +447,21 @@ comment on function public.map_filter_options() is
 
 **Tests:** add `map_filter_options` to the `anon_functions` allowlist in `supabase/tests/03_anon_rls.test.sql`. As `anon`, the function succeeds. Every project is listed, including the seeded one with no stations, which has `station_count = 0`. Each project carries its `organization_id`. Only organizations that hold a role or manage a project are listed. No key contains a notes field.
 
-### S7. Deploy and drift-check workflows — map: next free `yy` when it lands
+### S7. Deploy and drift-check workflows — map `0.10.0`
+
+> **Done (0.10.0).** `.github/workflows/database-deploy.yml`, `.github/workflows/database-drift.yml`, and `.github/scripts/supabase_ci.mjs`. Setup and day-to-day use are in `supabase/README.md`. Every CLI behavior below was checked against the local stack with CLI 3.1.0. The plan as first written follows this note; where they differ, this note wins:
+> - **No Supabase access token.** Every command used here (`db push`, `migration list`, `db advisors`, `db diff --to`) accepts a database URL (`--remote=<url>`), so neither workflow runs `supabase link` and neither environment holds `SUPABASE_ACCESS_TOKEN`. A personal access token reaches every project in the account, so not storing one in GitHub removes the largest secret from the plan. `supabase-production` holds `SUPABASE_DB_URL` (the owner's Session pooler URL) instead of `SUPABASE_DB_PASSWORD`.
+> - **Least-privilege role, not `pg_read_all_data`.** `pg_read_all_data` can read every row, including true coordinates and contacts. The checks need only the catalog, which every role can read, plus the migration history. The role is `ci_drift_check`, with `USAGE` on `supabase_migrations`, `SELECT` on `schema_migrations`, and `default_transaction_read_only = on`. Locally, as that role, the dry-run push, migration list, schema diff, and advisors all work, and reading `Stations` is denied. The **Plan** job uses it too, so the only job with write access is the one behind approval.
+> - **Target check.** With a URL, the CLI reports `"target": {"kind": "db-url", ...}`, not `linked`. `supabase_ci.mjs` fails unless the target is a `db-url` with a non-local host, and checks before each job that the URL's user (`<role>.<ref>`) or host (`db.<ref>.supabase.co`) matches `SUPABASE_PROJECT_ID`.
+> - **`db diff` exits 0 when it finds drift**, as the plan suspected. The script fails on a non-empty `.diff` instead. With no drift, `.diff` is `""` for both the owner and `ci_drift_check`. With drift, `ci_drift_check`'s diff starts with `SET local check_function_bodies = off;`. The diff caught an anon grant, an anon policy, a table comment, and grants on `map_private` objects.
+> - **Advisors** run with `--fail-on none`, and the script fails on any `ERROR` finding, so a connection error and a finding are told apart. As `ci_drift_check`, they flagged a table without RLS.
+> - **`--skip-vault` on every push.** `db push` writes Vault secrets from `config.toml` before migrating. None are configured, but a future `[db.vault]` entry must never overwrite the hosted masking secret.
+> - **TLS required:** `PGSSLMODE=require` on every step that connects only to the hosted database. The CLI honors it: locally, it refused a server without TLS. The schema diff step is the exception, because it also connects to its shadow database on the runner, which has no TLS.
+> - **No `workflow_dispatch` on the deploy.** A manual trigger could deploy a commit that never passed CI. To retry, re-run the failed jobs, or run `Database` on `main` by hand, which starts a deploy when it passes. The deploy's trigger also requires the `Database` run's event to be `push` or `workflow_dispatch` from this repo, because a pull request from a fork whose branch is named `main` would otherwise match `branches: [main]`.
+> - **Secrets only on the steps that use them**, so `npm ci` install scripts never see them.
+> - **Version:** S7 landed after S6, so it took `0.10.0`, and map commits 7–17 each moved up one `yy` in `map_app_plan.md`.
+> - **Hosted setup (2026-11-12):** `ci_drift_check` was created by hand. A read-only catalog query confirmed it can log in, is read-only by default, can read the migration history but not write it, can read none of `public`'s tables, and has no usage on `map_private`. The Session pooler accepts it: `migration list` as `ci_drift_check.<ref>` with `PGSSLMODE=require` listed all 7 migrations on both sides. Both GitHub environments were set up.
+> - **Drift checks run by hand against the hosted project (2026-11-12),** as `ci_drift_check` from a laptop, before merging: `db diff` on `public,map_private` found no differences, so nothing the platform manages shows up as drift, and the security advisors reported no errors. What's left is the first run inside the workflows after merge (see the README).
 
 S1 added `.github/workflows/database.yml`, which tests migrations against a throwaway local database and never touches the hosted project. This step adds two workflows that do connect to it. Both use the same setup:
 
@@ -503,9 +517,9 @@ Catches the hosted database drifting from the repo: a table or policy edited in 
 
 ## Order of work
 
-S1 → S2 → S2b → S3 → S4 → S5 → S6, with S7 anywhere after S3 and before map commit 10. The map backend doesn't call Supabase until map commit 10, so there's no window during these steps where the live map is broken or exposed. S7 should land before the live map relies on the access rules, so the drift check is guarding them from day one. Until S7 lands, push by hand with `supabase db push --remote` as described in each step and in the "Workflow for a schema change" section of `supabase/README.md`.
+S1 → S2 → S2b → S3 → S4 → S5 → S6, with S7 anywhere after S3 and before map commit 10. The map backend doesn't call Supabase until map commit 10, so there's no window during these steps where the live map is broken or exposed. S7 should land before the live map relies on the access rules, so the drift check is guarding them from day one. S1–S6 were pushed by hand with `supabase db push --remote`. Since S7 (map `0.10.0`), the deploy workflow is the only path: see "Workflow for a schema change" in `supabase/README.md`.
 
-Once the map is live, push any migration that changes access (a revoke, a grant, or a function's columns) in the same `supabase db push --remote` as the function changes that go with it.
+Once the map is live, merge any migration that changes access (a revoke, a grant, or a function's columns) in the same PR, and so the same deploy, as the function changes that go with it.
 
 The map's backend foundation (map commits 7–9) doesn't depend on any of this and can proceed in parallel.
 
