@@ -1,6 +1,6 @@
 # Map Backend
 
-Flask API that serves data to the map frontend. Right now it has a health-check route, settings from the environment, a Supabase database wrapper, and JSON error responses. Map commit 9 adds the layer routes. See [the map plan](../../documentation/map/map_app_plan.md) for what comes next.
+Flask API that serves data to the map frontend. It has settings from the environment, a Supabase database wrapper, JSON error responses, and a generic layer framework with its routes. No layers are registered yet: map commit 10 adds the stations layer. See [the map plan](../../documentation/map/map_app_plan.md) for what comes next.
 
 ## Quickstart
 From the repo root:
@@ -52,6 +52,28 @@ Every error response has the shape `{"error": {"code": "...", "message": "..."}}
 
 The messages for 5xx errors are fixed and generic. The cause (SQL error, hostname, traceback) is logged on the server and never sent to the browser.
 
+## Layers and routes
+Everything the map draws is a **layer**: a class in `src/backend/layers/<name>.py` that implements the `Layer` protocol in `layers/base.py`, with its instance listed in `REGISTRY` in `layers/__init__.py`. The routes are generic and work with whatever is registered:
+
+| Route (GET) | Returns |
+| --- | --- |
+| `/api/health` | `{"status": "ok"}` |
+| `/api/layers` | `{"layers": [...]}`, one manifest entry per layer, with filters (and their options), popup fields, and `style_by` |
+| `/api/layers/<layer>/features?<filters>` | GeoJSON `FeatureCollection` |
+| `/api/layers/<layer>/features/<id>` | The feature's detail, or 404 |
+
+A layer has a static part: `id`, `title`, `popup_fields`, `filters` (`FilterDef`: key, label, type), and `style_by`. The features route parses query parameters with these alone. A layer also has three methods that take the database:
+- `options(db)` returns filter options and `style_by` values, read only when the manifest is built
+- `features(db, filters)` returns GeoJSON features with **masked** coordinates
+- `detail(db, id)` returns a `Detail`, or `None` for a 404
+
+**Filter query parameters** are whole-number ids:
+- `select`: one value, e.g. `?project=4`
+- `multiselect`: repeated or comma-separated values, e.g. `?station_type=1&station_type=2` or `?station_type=1,2`
+- `boolean`: `true`/`false` or `1`/`0`
+
+A blank value means "no filter", and the layer receives `None` for it. Each of these returns a 400 with a message naming the parameter: an unknown parameter, a non-numeric or oversized id, a single-value filter given twice, or more than 100 values in a multiselect. `/api/layers` doesn't touch the database when no layers are registered.
+
 ## Smoke test against a real project
 `scripts/smoke_supabase.py` checks the access rules the map relies on, using the key the backend is configured with. The `Stations` and `Contacts` tables must refuse with *permission denied* (an empty result fails too). `mask_point` must be unreachable. `map_stations` must return only its seven public columns, and `map_filter_options` its five lists.
 
@@ -82,6 +104,9 @@ Tests never read your `.env` or environment: fixtures in `tests/conftest.py` bui
 | `src/backend/api.py` | The `/api` Blueprint: every route |
 | `src/backend/db.py` | `Database` protocol, `SupabaseDatabase` (timeout, error translation), `get_database` |
 | `src/backend/errors.py` | JSON error handlers |
+| `src/backend/layers/__init__.py` | `REGISTRY` of layers, plus `get_layer` and `get_layers` |
+| `src/backend/layers/base.py` | The `Layer` protocol, manifest and detail types, filter parsing, GeoJSON helpers |
 | `scripts/smoke_supabase.py` | Checks the anon key's access on a real Supabase project |
 | `tests/conftest.py` | Shared fixtures: `app` and `client` with no Supabase configured, and `clean_env` |
+| `tests/fakes.py` | `FakeDatabase` (canned rpc results) and `FakeLayer` (one filter of each type) |
 | `tests/` | pytest tests |

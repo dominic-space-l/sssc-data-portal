@@ -3,6 +3,44 @@
 Versioning follows `xx.yy.zz` (see [documentation/CLAUDECODE/CLAUDE.md](../CLAUDECODE/CLAUDE.md)):
 `xx` = major feature, `yy` = steps/commits toward a major feature, `zz` = small updates and revisions.
 
+## 0.13.0 — 2026-11-12
+
+Map commit 9: the layer framework and its generic routes.
+- **`layers/base.py`:**
+  - the `Layer` protocol: static `id`, `title`, `default_visible`, `location_note`, `muted_label`, `popup_fields`, `filters`, `style_by`, plus `options(db)`, `features(db, filters)`, and `detail(db, id)`
+  - manifest types (`PopupField`, `FilterDef`, `FilterOption` with `implies` and `hint`, `StyleBy`, `StyleValue`, `LayerOptions`) and detail types (`Detail`, `DetailSection`, `DetailField`, `Link`), each serializing to the API contract
+  - filter parsing, and the `point_feature` and `feature_collection` helpers
+- **Filter parsing:**
+  - Ids are ASCII whole numbers up to the bigint maximum.
+  - A multiselect takes repeated or comma-separated values, de-duplicated, up to 100. A boolean takes `true`/`false`/`1`/`0`.
+  - A blank value means no filter.
+  - An unknown parameter, an invalid value, or two values for a single-value filter is a 400 with a message naming the parameter.
+- **`layers/__init__.py`:** an empty `REGISTRY`, plus `get_layer` and `get_layers`. `create_app(config, database, layers)` copies the registry into the app and refuses duplicate or non-URL-safe layer ids.
+- **Routes:**
+  - `/api/layers` returns `{"layers": [...]}`. With no layers, it doesn't touch the database.
+  - `/api/layers/<layer>/features` returns a GeoJSON `FeatureCollection`.
+  - `/api/layers/<layer>/features/<int:id>` returns a detail, or 404.
+  - Unknown layers and features are a JSON 404. Database failures inside a layer keep their 502 or 503.
+- **Design:** filter options and `style_by` values come from a new `options(db)` method, called only for the manifest. The features route parses filters from the static definitions, with no extra database call.
+- **Tests:** 119 (from 55). `tests/fakes.py` adds `FakeDatabase` and `FakeLayer`. `test_layer_base.py` covers parsing per type, serialization, and manifest building. `test_api.py` covers each route against the fakes, filters reaching the layer, 400s, 404s, 502/503 pass-through, and registry validation. Checked by hand: a throwaway layer over `map_stations` on the local stack returned the expected stations for each filter combination.
+- **Docs:** the backend README has a "Layers and routes" section and an updated directory guide. `map/README.md`'s directory guide is updated. The plan's step 9 notes what was decided. `pyproject.toml` is at `0.13.0`.
+
+**Files changed**
+- `map/backend/src/backend/__init__.py`
+- `map/backend/src/backend/api.py`
+- `map/backend/src/backend/layers/__init__.py`
+- `map/backend/src/backend/layers/base.py`
+- `map/backend/tests/conftest.py`
+- `map/backend/tests/fakes.py`
+- `map/backend/tests/test_api.py`
+- `map/backend/tests/test_layer_base.py`
+- `map/backend/pyproject.toml`
+- `map/backend/uv.lock`
+- `map/backend/README.md`
+- `map/README.md`
+- `documentation/map/map_app_plan.md`
+- `documentation/map/CHANGELOG.md`
+
 ## 0.12.0 — 2026-11-12
 
 Map commit 8: database access, errors, and the `/api` blueprint.

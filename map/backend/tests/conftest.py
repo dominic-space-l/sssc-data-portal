@@ -1,11 +1,11 @@
 """Shared pytest fixtures for the map backend.
 
 Role: builds apps with an explicit ``Config`` so tests never read a developer's real
-``.env`` or environment, and gives tests that do exercise environment loading a
-clean, automatically restored environment.
+``.env`` or environment, and gives tests that exercise environment loading a clean,
+automatically restored environment. The fake database and layer are in ``fakes.py``.
 
 Usage:
-    def test_something(client): ...      # app with no Supabase configured
+    def test_something(client): ...      # app with no Supabase, no layers
     def test_env(clean_env): ...          # SUPABASE_* and CACHE_MAX_AGE unset
 """
 
@@ -19,7 +19,7 @@ ENV_NAMES = ("SUPABASE_URL", "SUPABASE_KEY", "CACHE_MAX_AGE")
 
 @pytest.fixture
 def app():
-    """An app with no Supabase settings, as on a fresh checkout.
+    """An app with no Supabase settings and no layers, as on a fresh checkout.
 
     Returns:
         A Flask app built with ``Config()``.

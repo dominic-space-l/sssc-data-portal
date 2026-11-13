@@ -11,6 +11,7 @@ Usage:
 """
 
 import logging
+from collections.abc import Sequence
 
 from flask import Flask, current_app
 
@@ -18,6 +19,8 @@ from backend.api import api
 from backend.config import CONFIG_KEY, Config
 from backend.db import Database, init_database
 from backend.errors import register_error_handlers
+from backend.layers import init_layers
+from backend.layers.base import Layer
 
 __all__ = ["CONFIG_KEY", "PORT", "create_app", "get_config", "main"]
 
@@ -26,7 +29,11 @@ __all__ = ["CONFIG_KEY", "PORT", "create_app", "get_config", "main"]
 PORT = 5001
 
 
-def create_app(config: Config | None = None, database: Database | None = None) -> Flask:
+def create_app(
+    config: Config | None = None,
+    database: Database | None = None,
+    layers: Sequence[Layer] | None = None,
+) -> Flask:
     """Builds and configures the Flask application.
 
     Args:
@@ -35,6 +42,7 @@ def create_app(config: Config | None = None, database: Database | None = None) -
         database: A Database for every request (tests pass a fake). If None, a
             Supabase-backed one is created from the settings on first use, so the
             app starts without Supabase.
+        layers: The layers to serve, in manifest order. If None, ``layers.REGISTRY``.
 
     Returns:
         A configured Flask app with all routes and error handlers registered. The
@@ -42,14 +50,16 @@ def create_app(config: Config | None = None, database: Database | None = None) -
 
     Raises:
         ConfigError: If an environment value is present but malformed.
+        ValueError: If two layers share an id, or an id isn't URL-safe.
 
     Usage:
-        app = create_app()                            # dev server, WSGI servers
-        app = create_app(Config(), FakeDatabase())    # tests
+        app = create_app()                                         # dev server
+        app = create_app(Config(), FakeDatabase(), [FakeLayer()])  # tests
     """
     app = Flask(__name__)
     app.config[CONFIG_KEY] = config if config is not None else Config.from_env()
     init_database(app, database)
+    init_layers(app, layers)
     register_error_handlers(app)
     app.register_blueprint(api)
     return app

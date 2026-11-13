@@ -324,6 +324,23 @@ Each step adds its own pgTAP tests.
 - Generic routes: `/api/layers`, `/api/layers/<layer>/features`, `/api/layers/<layer>/features/<id>`. An unknown layer returns 404.
 - Tests run entirely against `FakeLayer` and `FakeDatabase`.
 
+> **Done (0.13.0).** What the implementation decided:
+> - **Static and database-backed parts are split.** `filters` (`FilterDef`: key, label, type) and `style_by` (property, label, active_when, fallback_label) are static, so the features route parses query parameters without a database call. A new protocol method, `options(db) -> LayerOptions`, returns each filter's options and the `style_by` values, and is called only when the manifest is built. The stations layer fills both from one `map_filter_options` call. `build_manifest_entry` raises if a layer returns options for an unknown or boolean filter.
+> - **`muted_label`** is on the protocol too (the plan's list left it out), with `location_note`. Unset optional keys (`location_note`, `muted_label`, `style_by`, an option's `implies` and `hint`) are left out of the JSON.
+> - **`features()` returns a list of GeoJSON Features.** The route wraps them in a `FeatureCollection`. `point_feature` and `feature_collection` in `base.py` build both.
+> - **The manifest is `{"layers": [...]}`.** It doesn't touch the database when no layers are registered. With layers but no Supabase settings, it's a 503 `database_not_configured`.
+> - **Filter parsing:**
+>   - Values are ASCII whole-number ids up to the bigint maximum. Larger ones are a 400, not a database 502.
+>   - A multiselect takes repeated or comma-separated values, de-duplicated in order, up to 100.
+>   - A boolean takes `true`/`false`/`1`/`0`.
+>   - A blank value is `None`.
+>   - An unknown parameter, or a single-value filter given twice, is a 400.
+>   - The layer always receives every filter key.
+> - **Feature ids are integers** (`<int:feature_id>`). A non-integer id is a 404, like an unknown feature.
+> - **Registry:** `create_app(config, database, layers)` copies `REGISTRY` (or the given layers) into `app.extensions`. `get_layer` and `get_layers` read it. Duplicate or non-URL-safe ids (lowercase letters, digits, `-`, `_`) stop the app starting.
+> - **Fakes** are in `tests/fakes.py`, not `conftest.py`, because pytest discourages importing from conftest. `FakeLayer` has one filter of each type and a `style_by`.
+> - A throwaway layer over `map_stations` through the real `SupabaseDatabase` on the local stack returned the S5-expected stations for each filter combination.
+
 ### Stations on the map
 
 **10. Stations layer — `0.14.0`**
