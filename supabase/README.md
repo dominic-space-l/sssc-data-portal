@@ -33,7 +33,7 @@ One-time setup to work against the hosted project:
 
 These hold secrets, so they're done by hand in the dashboard's SQL editor and never go in a migration:
 
-- **Location-masking secret** (before S5's `map_stations` is used): `select vault.create_secret('<value>', 'map_location_mask_secret');`, with the value from `openssl rand -base64 48`. Don't keep a copy anywhere else. Changing it later moves every marker on the public map. Until it exists, `map_private.mask_point` raises `location masking is not configured`, and so does every `map_stations` call that would return a station. Check that it exists with `select name, created_at from vault.secrets;`. Locally, `seed.sql` creates a throwaway one.
+- **Location-masking secret** (done on the hosted project on 2026-11-12; redo only on a new or rebuilt project): `select vault.create_secret('<value>', 'map_location_mask_secret');`, with the value from `openssl rand -base64 48`. Don't keep a copy anywhere else. Changing it later moves every marker on the public map. Until it exists, `map_private.mask_point` raises `location masking is not configured`, and so does every `map_stations` call that would return a station. Check that it exists with `select name, created_at from vault.secrets;`. Locally, `seed.sql` creates a throwaway one.
 - **Exposed schemas:** **Settings → API → Exposed schemas** must not include `map_private`.
 
 `supabase/.temp/` (link state) and `.env*` files are git-ignored. Never commit database passwords or access tokens.

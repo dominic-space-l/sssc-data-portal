@@ -250,7 +250,7 @@ alter default privileges in schema public revoke all on sequences from anon;
 ### S4. Masking secret and `mask_point` — map `0.7.0`
 
 > **Done (0.7.0).** Migration `20261112062156_s4_mask_point.sql`, tests in `supabase/tests/04_mask_point.test.sql`. The function is the one below, unchanged. What the implementation found:
-> - **The hosted secret is still a manual step.** Run the `vault.create_secret` call below before S5's `map_stations` is used. Until then, `mask_point` raises instead of returning a point. The step is also listed under "Hosted project: one-time manual steps" in `supabase/README.md`.
+> - **The hosted secret is a manual step, done on 2026-11-12.** It was created by hand with the `vault.create_secret` call below, not in a migration. Without it, `mask_point` raises instead of returning a point. To redo it (for example on a rebuilt project), follow "Hosted project: one-time manual steps" in `supabase/README.md`.
 > - **Local secret in the seed.** The plan had each test insert a secret inside its transaction. Instead, `supabase/seed.sql` creates a throwaway local `map_location_mask_secret`, so masking works in local development and in S5's tests without extra setup. The tests delete or replace it inside their own transactions when they need to. `supabase db push` never sends the seed.
 > - pgcrypto, Vault (0.3.1), and PostGIS are already installed by Supabase in `extensions` and `vault`, so the `extensions.` prefixes work as written.
 > - `map_private` is now linted in CI and in `npm run db:lint`.
