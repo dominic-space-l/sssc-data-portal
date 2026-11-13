@@ -9,7 +9,7 @@
 -- rolls back, so it leaves no changes behind.
 --
 -- anon_functions below lists the only functions anon is meant to call: map_stations
--- (S5), and map_filter_options once S6 adds it.
+-- (S5) and map_filter_options (S6).
 
 begin;
 create extension if not exists pgtap with schema extensions;
@@ -19,8 +19,7 @@ select plan(10 + (select count(*)::int from pg_tables where schemaname = 'public
 
 create temp table anon_functions (proname name primary key) on commit drop;
 grant select on anon_functions to anon;
-insert into anon_functions values ('map_stations');  -- S5
--- insert into anon_functions values ('map_filter_options');  -- S6
+insert into anon_functions values ('map_stations'), ('map_filter_options');  -- S5, S6
 
 -- ---------------------------------------------------------------------------------------
 -- Catalog: RLS, grants, default privileges, policies, functions

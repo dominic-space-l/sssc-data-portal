@@ -86,7 +86,7 @@ The stations layer has four filters. They combine with AND. Within a multiselect
 | Filter | Control | Source | Matches a station when |
 | --- | --- | --- | --- |
 | `project` | dropdown (single) | All `OrganizationProjects`. Those with no stations are tagged "No stations". | `Stations.ProjectID` equals the project |
-| `organization` | dropdown (single) | `Organizations` that have at least one `StationOrganizationRole` | the station has a role with the organization *(only when no project is selected; see below)* |
+| `organization` | dropdown (single) | `Organizations` that have at least one `StationOrganizationRole` or manage a project (so a project's organization is always an option) | the station has a role with the organization *(only when no project is selected; see below)* |
 | `station_type` | multiselect | `StationTypes` | `Stations.StationTypeID` is one of the selected types |
 | `observation_type` | multiselect | `ObservationTypes` | the station has a `StationObservations` row for one of the selected types |
 
@@ -282,7 +282,7 @@ The Supabase steps (1–6) and the backend foundation (7–9) don't depend on ea
 
 **5. `map_stations` function — `0.8.0`** (S5): one call returns the filtered stations with masked points and the organization's roles at each. anon can execute it, and nothing else in `public`.
 
-**6. `map_filter_options` function — `0.9.0`** (S6), including per-project station counts.
+**6. `map_filter_options` function — `0.9.0`** (S6): every dropdown's options in one call, including per-project station counts. Organizations are listed when they hold a role or manage a project.
 
 Each step adds its own pgTAP tests.
 
@@ -338,7 +338,7 @@ Each step adds its own pgTAP tests.
 - **Feature:** pick a project to see only its stations, and see at a glance which projects have none.
 
 **15. Organization filter with role colors — `0.18.0`**
-- Backend: an `organization` select filter, with options from `map_filter_options()` (organizations with at least one role). Passed as `p_organization`, and the rows' `roles` become `properties.roles`. The layer declares `style_by` with the roles from `map_filter_options()` as its values.
+- Backend: an `organization` select filter, with options from `map_filter_options()` (organizations with at least one role or a project). Passed as `p_organization`, and the rows' `roles` become `properties.roles`. The layer declares `style_by` with the roles from `map_filter_options()` as its values.
 - Frontend: `layers/markers.ts` builds an SVG marker from the `style_by` palette in `registry.ts`, using Okabe–Ito colors in `RoleID` order: a solid circle for one role, and a pie with one equal slice per role for several. Markers with no roles use the fallback gray. Muted markers keep their slices but are greyed out. `legend/` shows the role colors while `style_by.active_when` has a value, plus the `muted_label` entry whenever any muted marker is on the map.
 - **Feature:** pick an organization to see its stations, colored by its role at each one.
 
