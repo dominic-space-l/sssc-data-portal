@@ -209,7 +209,7 @@ map/backend/
 ├── src/backend/
 │   ├── __init__.py          # create_app(), main()
 │   ├── config.py            # env loading
-│   ├── db.py                # Database: Supabase client, rpc(), timeout, UpstreamError, MaskingUnavailable
+│   ├── db.py                # Database: Supabase client, rpc(), timeout, UpstreamError, MaskingUnavailableError
 │   ├── errors.py            # JSON error handlers
 │   ├── api.py               # generic Blueprint routes
 │   └── layers/
@@ -303,10 +303,20 @@ Each step adds its own pgTAP tests.
 > - `CACHE_MAX_AGE` defaults to 300 seconds. Commit 17 uses it.
 
 **8. Database access, errors, and blueprint — `0.12.0`**
-- `db.py`: a `Database` class wrapping the Supabase client, with `rpc(name, params)` and a request timeout. Supabase failures are raised as `UpstreamError`. The "location masking is not configured" error (`P0001`) is raised as `MaskingUnavailable`. It is created lazily and stored in `app.extensions`.
-- `errors.py`: JSON 400, 404, and 500 responses, with `UpstreamError` → 502 and `MaskingUnavailable` → 503. Details are logged on the server only.
+- `db.py`: a `Database` class wrapping the Supabase client, with `rpc(name, params)` and a request timeout. Supabase failures are raised as `UpstreamError`. The "location masking is not configured" error (`P0001`) is raised as `MaskingUnavailableError`. It is created lazily and stored in `app.extensions`.
+- `errors.py`: JSON 400, 404, and 500 responses, with `UpstreamError` → 502 and `MaskingUnavailableError` → 503. Details are logged on the server only.
 - `api.py`: a Blueprint at `/api`, with `/api/health` moved into it unchanged.
 - `scripts/smoke_supabase.py`: confirms that, with the anon key, `Stations` and `Contacts` **can't** be read and both functions **can** be called.
+
+> **Done (0.12.0).** What the implementation decided or found:
+> - **Exception names end in `Error`** (`MaskingUnavailableError`, plus `DatabaseNotConfiguredError`), as PEP 8 and ruff's N818 require. This plan uses the new names throughout.
+> - **`Database` is a protocol,** and `SupabaseDatabase` implements it. `db.py` is the only module that imports `supabase`. `get_database()` creates the client on first use, behind a lock, and stores it in `app.extensions["map_database"]`. `create_app(config, database=None)` lets tests inject a fake.
+> - **A third error, `DatabaseNotConfiguredError` (503 `database_not_configured`),** covers a data request when `SUPABASE_URL` or `SUPABASE_KEY` isn't set. The app still boots and `/api/health` works.
+> - **Translation, from what supabase-py 2.33 raised against the local stack:** only `APIError` with code `P0001` and the exact masking message becomes `MaskingUnavailableError`. Every other `APIError` (`42501`, `PGRST202`, `22P02`, a bad key) and every `httpx` error (refused, connect or read timeout) becomes `UpstreamError`. The cause is logged, and the exception text stays generic. The timeout is 10 s, via `ClientOptions(postgrest_client_timeout=...)`.
+> - **Error codes:** `bad_request`, `not_found`, `method_not_allowed` (from the HTTP status name), `upstream_error` 502, `masking_unavailable` 503, `database_not_configured` 503, and `internal_error` 500. 5xx messages are fixed sentences. A 400's message comes from `abort(400, description=...)`, so commit 9's filter errors must be safe to show users.
+> - **The smoke script** also checks that `map_stations` returns exactly its seven columns, that `map_filter_options` returns its five lists, and that `mask_point` is unreachable (`PGRST202`). A table read that *succeeds* with zero rows fails, because the grant is the regression even when RLS hides the rows. Locally it passed with both key formats, and it failed as expected after a temporary `grant select on "Stations" to anon`.
+> - The local stack accepted a made-up `sb_publishable_` key. The hosted gateway is expected to reject one, which the smoke script would report as an `UpstreamError`.
+> - **Hosted project (2026-11-12):** the smoke script with the hosted anon key: 5 passed, 0 failed.
 
 **9. Layer framework — `0.13.0`**
 - `layers/base.py`: the `Layer` protocol (`id`, `title`, `default_visible`, `location_note`, `popup_fields`, `filters`, `style_by`, `features(db, filters)`, `detail(db, id)`). A `FilterDef` parses and validates query params, so invalid values return 400. `FilterOption` has optional `implies` and `hint`, and `StyleBy` is optional on a layer.
@@ -319,7 +329,7 @@ Each step adds its own pgTAP tests.
 **10. Stations layer — `0.14.0`**
 - `layers/stations.py`: `features()` calls `db.rpc("map_stations", {})` and turns each row into a feature with `name`, `code`, and `active` (display-ready) properties, `muted` (`true` when `is_active` is `false`), and the masked point. `location_note` is "Approximate location", and `muted_label` is "Inactive".
 - Popup fields: Station, Code, Active. Detail: the same three fields, as one section, from the same function filtered to one id.
-- Add it to `REGISTRY`. Tests use RPC-shaped fixture rows, plus a check that `MaskingUnavailable` from the fake database becomes a 503.
+- Add it to `REGISTRY`. Tests use RPC-shaped fixture rows, plus a check that `MaskingUnavailableError` from the fake database becomes a 503.
 
 **11. Frontend models and API client — `0.15.0`**
 - `core/models.ts` typed to match the API contract, including `FilterOption.implies`, `FilterOption.hint`, and `StyleBy`. `core/map-api.ts` (`health()`, `layers()`, `features(layer, filters)`, `detail(layer, id)`) replaces `services/api.ts`.

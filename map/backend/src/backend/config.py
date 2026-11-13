@@ -33,6 +33,9 @@ ENV_FILE = Path(__file__).resolve().parents[2] / ".env"
 
 DEFAULT_CACHE_MAX_AGE = 300
 
+# Key under which create_app stores the Config in ``app.config``.
+CONFIG_KEY = "MAP_CONFIG"
+
 
 class ConfigError(ValueError):
     """A configuration value is present but unusable."""

@@ -12,7 +12,8 @@
 | Path | Contents |
 | --- | --- |
 | `backend/` | Flask API (uv project). See [backend/README.md](backend/README.md). |
-| `backend/src/backend/` | App source: app factory, settings (`config.py`), and routes |
+| `backend/src/backend/` | App source: app factory, settings (`config.py`), routes (`api.py`), database access (`db.py`), and JSON errors (`errors.py`) |
+| `backend/scripts/` | `smoke_supabase.py`: checks the anon key's access on a real Supabase project |
 | `backend/.env.example` | Template for the backend's local settings (`.env`) |
 | `backend/tests/` | pytest tests |
 | `frontend/` | Angular + Leaflet app. See [frontend/README.md](frontend/README.md). |

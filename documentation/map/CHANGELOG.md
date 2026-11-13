@@ -3,6 +3,34 @@
 Versioning follows `xx.yy.zz` (see [documentation/CLAUDECODE/CLAUDE.md](../CLAUDECODE/CLAUDE.md)):
 `xx` = major feature, `yy` = steps/commits toward a major feature, `zz` = small updates and revisions.
 
+## 0.12.0 — 2026-11-12
+
+Map commit 8: database access, errors, and the `/api` blueprint.
+- **`db.py`:** a `Database` protocol with `rpc(name, params)`, and `SupabaseDatabase`, the only code that imports `supabase`, with a 10-second timeout. The masking error (`P0001`, "location masking is not configured") becomes `MaskingUnavailableError`. Every other Supabase error, timeout, or connection failure becomes `UpstreamError`, with the cause logged on the server only. `get_database()` creates the client on first use and keeps it in `app.extensions`. Without Supabase settings, it raises `DatabaseNotConfiguredError`.
+- **`errors.py`:** every error is `{"error": {"code", "message"}}`. HTTP errors keep their status (`bad_request`, `not_found`, `method_not_allowed`, ...). `UpstreamError` is 502, `MaskingUnavailableError` and `DatabaseNotConfiguredError` are 503, and anything else is 500 `internal_error`, logged with its traceback. 5xx responses never include the cause.
+- **`api.py`:** a Blueprint at `/api`. `/api/health` moved into it unchanged.
+- **`create_app(config=None, database=None)`:** registers the blueprint and error handlers, and accepts a fake database for tests. The dev server now logs at INFO.
+- **`scripts/smoke_supabase.py`:** with the configured anon key, checks that `Stations` and `Contacts` refuse with permission denied (an empty result fails too), that `mask_point` is unreachable, and that `map_stations` (exactly seven columns) and `map_filter_options` (exactly five lists) answer. It prints no data. Locally, all 5 checks passed with both the publishable key and the legacy anon JWT. With a temporary `grant select on "Stations" to anon`, it failed as it should. Against the hosted project with its anon key, all 5 passed.
+- **Naming:** the plan's `MaskingUnavailable` is `MaskingUnavailableError`, for PEP 8 and ruff N818. The plan is updated to match.
+- **Tests:** 55 (from 29). `test_db.py` covers success and parameters, each error translation (shaped like what supabase-py raised against the local stack), logged-not-leaked details, the timeout, and lazy creation. `test_errors.py` covers each status and code, that no detail leaks, JSON 404 and 405, the 400 message passing through, and traceback logging. Against the live local stack, with the Vault secret renamed, `map_stations` raised `MaskingUnavailableError`.
+- **Docs:** the backend README has "Database access and errors" and "Smoke test" sections and an updated directory guide. `map/README.md`'s directory guide is updated. The plan's step 8 notes what was decided. `pyproject.toml` is at `0.12.0`.
+
+**Files changed**
+- `map/backend/src/backend/__init__.py`
+- `map/backend/src/backend/api.py`
+- `map/backend/src/backend/config.py`
+- `map/backend/src/backend/db.py`
+- `map/backend/src/backend/errors.py`
+- `map/backend/scripts/smoke_supabase.py`
+- `map/backend/tests/test_db.py`
+- `map/backend/tests/test_errors.py`
+- `map/backend/pyproject.toml`
+- `map/backend/uv.lock`
+- `map/backend/README.md`
+- `map/README.md`
+- `documentation/map/map_app_plan.md`
+- `documentation/map/CHANGELOG.md`
+
 ## 0.11.0 — 2026-11-12
 
 Map commit 7: backend config and dependencies.
