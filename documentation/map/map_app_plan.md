@@ -385,7 +385,7 @@ Each step adds its own pgTAP tests.
 > - **Popups are built from DOM nodes with `textContent`** (`layers/popup.ts`), never HTML strings. A station name with markup renders as text. Missing values show `—`.
 > - **`StatusBadge`** (`status-badge/`) is now its own component, with `role="status"`. The placeholder Sitka marker, Leaflet's default-icon setup, and `src/assets.d.ts` (PNG imports) are removed.
 > - **Errors** are recorded in `MapState` (`layerLoads[...].error`, `manifestError`) but not shown yet. Step 17 adds the visible error state.
-> - **Checked** with `npm run dev:map` against the local Supabase stack: the page, health, manifest, and 4 stations (station 3 muted) all served through the dev proxy. No headless browser was available, so the rendered map itself was checked only in jsdom tests.
+> - **Checked** with `npm run dev:map` against the local Supabase stack: the page, health, manifest, and 4 stations (station 3 muted) all served through the dev proxy. No headless browser was available for automated checks, but the rendered map was checked by hand in a browser against the local stack (2026-11-12): the seeded test stations showed up as expected.
 
 ### Filtering and coloring
 
@@ -394,6 +394,13 @@ Each step adds its own pgTAP tests.
 - Frontend: `filter-panel/` renders a control for each `FilterDef` by type (`boolean` → checkbox, `select` → dropdown with an "All" entry, `multiselect` → checkbox list) and writes values to `MapState`. `MapView` redraws the layer when its filters change. The panel is generic, with no layer ids in its code.
 - `MapView` shows an empty state when the layer returns no features ("No stations match these filters").
 - **Feature:** filter stations by type and by what they observe.
+
+> **Done (0.17.0).** What the implementation decided:
+> - **Backend:** `stations.py` keeps one table mapping filter keys to `map_stations` parameters, and one options builder per filter. Each later step adds an entry to both. `options()` reads `map_filter_options` once per manifest, and its name order is kept. Unset filters are left out of the RPC (not sent as `null`), so the function's defaults apply.
+> - **`MapState.setFilter`** stores an empty list as `null`, and `clearFilters` resets a layer.
+> - **`FilterPanel`** (`filter-panel/`) is a collapsible `<details>` panel at the top right, with one section per visible layer that has filters. A select is a native dropdown with "All" (null), labelled by its filter. A multiselect is a `<fieldset>` of checkboxes, with values kept in option order. A boolean checkbox means true or no filter, never false. A "Clear filters" button shows while any filter is set. The selected dropdown entry is bound on its `<option>`, so it survives the options rendering after the select.
+> - **Empty state** (`map/empty-message.ts`): "No *stations* match these filters." when a filter is set, and "No *stations* to show." otherwise. It's built from the layer's title, so the code stays generic. It's shown in a `role="status"` region at the top center.
+> - **Checked live** on the local stack: the manifest lists both filters' options, and `station_type=2` → 2, 4; `observation_type=1,3` → 1, 3; `station_type=1&observation_type=2` → none.
 
 **14. Project filter — `0.18.0`**
 - Backend: a `project` select filter with every project as an option, sorted by name. Projects whose station count is 0 get `hint: "No stations"`. Passed as `p_project`.

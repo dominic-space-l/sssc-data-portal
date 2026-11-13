@@ -1,6 +1,6 @@
 # Map Backend
 
-Flask API that serves data to the map frontend. It has settings from the environment, a Supabase database wrapper, JSON error responses, and a generic layer framework with its routes. It serves one layer, **stations**: every monitoring station at a masked location, with its name, code, and active status. See [the map plan](../../documentation/map/map_app_plan.md) for what comes next.
+Flask API that serves data to the map frontend. It has settings from the environment, a Supabase database wrapper, JSON error responses, and a generic layer framework with its routes. It serves one layer, **stations**: every monitoring station at a masked location, with its name, code, and active status, filterable by station type and observation type. See [the map plan](../../documentation/map/map_app_plan.md) for what comes next.
 
 ## Quickstart
 From the repo root:

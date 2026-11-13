@@ -52,9 +52,12 @@ const FEATURES: FeatureCollection = {
   ],
 };
 
-/** A MapApi stand-in that records which layers' features were requested. */
+/** A MapApi stand-in that records which layers' features were requested, with filters. */
 class FakeMapApi {
   readonly requested: string[] = [];
+  readonly filtersRequested: FilterValues[] = [];
+  /** Set to change what later `features()` calls return. */
+  next$: Observable<FeatureCollection> | null = null;
 
   /**
    * @param manifest The layers `layers()` returns.
@@ -79,13 +82,13 @@ class FakeMapApi {
    * Records the request.
    *
    * @param layerId The layer requested.
-   * @param filters Its filters (unused).
-   * @return The canned features.
+   * @param filters Its filters.
+   * @return The canned features (`next$` if set).
    */
   features(layerId: string, filters: FilterValues = {}) {
-    void filters;
     this.requested.push(layerId);
-    return this.features$;
+    this.filtersRequested.push(filters);
+    return this.next$ ?? this.features$;
   }
 }
 
@@ -172,6 +175,43 @@ describe('MapView', () => {
       status: 'error',
       error: { status: 503, code: 'masking_unavailable', message: 'Unavailable.' },
     });
+  });
+
+  it('redraws a layer with its new filters when they change', async () => {
+    const api = new FakeMapApi([STATIONS], of(FEATURES));
+    const fixture = await render(api);
+    api.next$ = of({ type: 'FeatureCollection', features: [FEATURES.features[1]] });
+
+    TestBed.inject(MapState).setFilter('stations', 'station_type', [1]);
+    await fixture.whenStable();
+
+    expect(api.filtersRequested).toEqual([{}, { station_type: [1] }]);
+    expect(markers(fixture).map((m) => m.title)).toEqual(['Test Station 3']);
+  });
+
+  it('shows the empty state when a layer comes back with no features', async () => {
+    const api = new FakeMapApi([STATIONS], of(FEATURES));
+    const fixture = await render(api);
+    const element = fixture.nativeElement as HTMLElement;
+    expect(element.querySelector('.empty')).toBeNull();
+
+    api.next$ = of({ type: 'FeatureCollection', features: [] });
+    TestBed.inject(MapState).setFilter('stations', 'station_type', [9]);
+    await fixture.whenStable();
+
+    expect(markers(fixture)).toEqual([]);
+    expect(element.querySelector('.empty')!.textContent).toBe('No stations match these filters.');
+  });
+
+  it('shows the filter panel', async () => {
+    const withFilter: LayerManifest = {
+      ...STATIONS,
+      filters: [{ key: 'station_type', label: 'Station type', type: 'multiselect', options: [] }],
+    };
+    const fixture = await render(new FakeMapApi([withFilter], of(FEATURES)));
+    expect(
+      (fixture.nativeElement as HTMLElement).querySelector('map-filter-panel details'),
+    ).not.toBeNull();
   });
 
   it('shows the status badge', async () => {

@@ -84,6 +84,30 @@ describe('MapState', () => {
     expect(state.filtersFor('stations')).toEqual({});
   });
 
+  it('sets filters per layer and key', () => {
+    const state = stateWith(of([]));
+    state.setFilter('stations', 'project', 4);
+    state.setFilter('stations', 'station_type', [1, 2]);
+    state.setFilter('sites', 'project', 7);
+    expect(state.filtersFor('stations')).toEqual({ project: 4, station_type: [1, 2] });
+    expect(state.filtersFor('sites')).toEqual({ project: 7 });
+  });
+
+  it('stores an empty list as null, meaning no filter', () => {
+    const state = stateWith(of([]));
+    state.setFilter('stations', 'station_type', []);
+    expect(state.filtersFor('stations')).toEqual({ station_type: null });
+  });
+
+  it('clears one layer without touching another', () => {
+    const state = stateWith(of([]));
+    state.setFilter('stations', 'project', 4);
+    state.setFilter('sites', 'project', 7);
+    state.clearFilters('stations');
+    expect(state.filtersFor('stations')).toEqual({});
+    expect(state.filtersFor('sites')).toEqual({ project: 7 });
+  });
+
   it('records each layer load separately', () => {
     const state = stateWith(of([]));
     state.setLayerLoad('stations', { status: 'loading' });

@@ -8,9 +8,35 @@
   height: 100%;
 }
 
+// Overlays sit above Leaflet's panes and controls (z-index up to 1000).
+.filters {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 1000;
+}
+
+.messages {
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  z-index: 1000;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+.empty {
+  margin: 0 0 6px;
+  padding: 6px 12px;
+  border-radius: 4px;
+  background: #fff;
+  box-shadow: 0 1px 4px rgb(0 0 0 / 30%);
+  font: 14px/1.4 sans-serif;
+}
+
 .status {
   position: absolute;
   right: 10px;
   bottom: 24px;
-  z-index: 1000; // above Leaflet panes
+  z-index: 1000;
 }

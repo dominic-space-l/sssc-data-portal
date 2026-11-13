@@ -1,10 +1,10 @@
 """The stations layer: monitoring stations as waypoints, at masked locations.
 
-Role: everything about how stations appear on the map: popup fields, wording, and the
-GeoJSON properties. Its data comes only from the ``map_stations`` database function
-(supabase S5), which returns masked coordinates and a fixed set of columns. True
-coordinates never reach this module. Filters (steps 13-16 of the map plan) will map
-query parameters onto that function's parameters here.
+Role: everything about how stations appear on the map: popup fields, wording, filters,
+and the GeoJSON properties. Its data comes only from two database functions (supabase
+S5 and S6). ``map_stations`` returns masked coordinates and a fixed set of columns, so
+true coordinates never reach this module. ``map_filter_options`` supplies every filter's
+options.
 
 Properties of each feature:
     name     StationName
@@ -12,14 +12,18 @@ Properties of each feature:
     active   "Yes", "No", or "Unknown" (IsActive is nullable)
     muted    true when the station is inactive, so the map greys it out
 
+Filters (query parameter -> map_stations parameter):
+    station_type       multiselect -> p_station_types
+    observation_type   multiselect -> p_observation_types
+
 Usage:
     from backend.layers.stations import STATIONS
-    STATIONS.features(get_database(), {})
+    STATIONS.features(get_database(), {"station_type": [1, 2]})
 """
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping, Sequence
 from typing import Any
 
 from backend.db import Database
@@ -28,6 +32,8 @@ from backend.layers.base import (
     DetailField,
     DetailSection,
     FilterDef,
+    FilterOption,
+    FilterType,
     FilterValue,
     LayerOptions,
     PopupField,
@@ -39,13 +45,41 @@ MISSING_CODE = "—"
 
 _ACTIVE_LABELS = {True: "Yes", False: "No", None: "Unknown"}
 
+# The map_stations parameter each filter is passed as.
+_RPC_PARAMS = {
+    "station_type": "p_station_types",
+    "observation_type": "p_observation_types",
+}
+
+
+def _id_name_options(items: Sequence[Mapping[str, Any]]) -> list[FilterOption]:
+    """Turns ``[{"id", "name"}, ...]`` from map_filter_options into filter options.
+
+    Args:
+        items: One list from map_filter_options, already sorted by the database.
+
+    Returns:
+        One option per item, in the same order.
+
+    Usage:
+        _id_name_options(options["station_types"])
+    """
+    return [FilterOption(item["id"], item["name"]) for item in items]
+
+
+# How each filter's options are built from the map_filter_options result.
+_OPTION_BUILDERS: dict[str, Callable[[Mapping[str, Any]], list[FilterOption]]] = {
+    "station_type": lambda options: _id_name_options(options["station_types"]),
+    "observation_type": lambda options: _id_name_options(options["observation_types"]),
+}
+
 
 class StationsLayer:
     """Monitoring stations, drawn at the masked points ``map_stations`` returns.
 
     Usage:
         layer = StationsLayer()
-        layer.features(db, {})
+        layer.features(db, {"observation_type": [3]})
     """
 
     id = "stations"
@@ -58,29 +92,37 @@ class StationsLayer:
         PopupField("code", "Code"),
         PopupField("active", "Active"),
     )
-    filters: tuple[FilterDef, ...] = ()
+    filters = (
+        FilterDef("station_type", "Station type", FilterType.MULTISELECT),
+        FilterDef("observation_type", "Observes", FilterType.MULTISELECT),
+    )
     style_by: StyleBy | None = None
 
     def options(self, db: Database) -> LayerOptions:
-        """Returns the manifest options. There are none until the filters are added.
+        """Reads every filter's options with one ``map_filter_options`` call.
 
         Args:
-            db: The database (unused for now).
+            db: The database.
 
         Returns:
-            Empty LayerOptions.
+            Options for each filter, in the order the database sorts them (by name).
+
+        Raises:
+            UpstreamError: Supabase failed.
 
         Usage:
             StationsLayer().options(db)
         """
-        return LayerOptions()
+        options = db.rpc("map_filter_options")
+        return LayerOptions(filters={f.key: _OPTION_BUILDERS[f.key](options) for f in self.filters})
 
     def features(self, db: Database, filters: Mapping[str, FilterValue]) -> list[dict]:
-        """Returns every station as a point feature at its masked location.
+        """Returns the matching stations as point features at their masked locations.
 
         Args:
             db: The database.
-            filters: Parsed filters. The layer has none yet.
+            filters: Parsed filters. Unset (None) filters aren't sent, so
+                ``map_stations`` treats them as "no filter".
 
         Returns:
             GeoJSON Point features, in station id order.
@@ -90,9 +132,9 @@ class StationsLayer:
             UpstreamError: Supabase failed (502).
 
         Usage:
-            StationsLayer().features(db, {})
+            StationsLayer().features(db, {"station_type": [1]})
         """
-        return [_to_feature(row) for row in db.rpc("map_stations", {})]
+        return [_to_feature(row) for row in db.rpc("map_stations", _rpc_params(filters))]
 
     def detail(self, db: Database, feature_id: int) -> Detail | None:
         """Returns one station's name, code, and status.
@@ -130,6 +172,25 @@ class StationsLayer:
             ],
             data={"code": row["code"], "is_active": row["is_active"]},
         )
+
+
+def _rpc_params(filters: Mapping[str, FilterValue]) -> dict[str, Any]:
+    """Maps parsed filters onto map_stations parameters, leaving out unset ones.
+
+    Args:
+        filters: Parsed filters by key.
+
+    Returns:
+        The rpc params, e.g. ``{"p_station_types": [1, 2]}``.
+
+    Usage:
+        _rpc_params({"station_type": [1], "observation_type": None})
+    """
+    return {
+        _RPC_PARAMS[key]: value
+        for key, value in filters.items()
+        if value is not None and key in _RPC_PARAMS
+    }
 
 
 def _properties(row: Mapping[str, Any]) -> dict[str, Any]:

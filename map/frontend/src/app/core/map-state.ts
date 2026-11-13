@@ -3,8 +3,8 @@
  *
  * Components talk to each other only through this service (see "Data flow on the
  * frontend" in documentation/map/map_app_plan.md). `MapView` reads the visible layers
- * and their filters and reports each layer's load status here. The filter panel (map
- * commit 13) will write filter values here.
+ * and their filters and reports each layer's load status here. The filter panel writes
+ * filter values here.
  *
  * Usage:
  *   private readonly state = inject(MapState);
@@ -14,7 +14,7 @@
 
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { MapApi, describeApiError } from './map-api';
-import { ApiError, FilterValues, LayerManifest } from './models';
+import { ApiError, FilterValue, FilterValues, LayerManifest } from './models';
 
 /** Where a request stands. */
 export type LoadStatus = 'idle' | 'loading' | 'ready' | 'error';
@@ -88,6 +88,34 @@ export class MapState {
    */
   filtersFor(layerId: string): FilterValues {
     return this.filters()[layerId] ?? NO_FILTERS;
+  }
+
+  /**
+   * Sets one filter's value. `MapView` redraws the layer when its filters change.
+   *
+   * Usage: `state.setFilter('stations', 'station_type', [1, 2]);`
+   *
+   * @param layerId The layer's id.
+   * @param key The filter's key.
+   * @param value The new value. An empty list is stored as null (no filter).
+   */
+  setFilter(layerId: string, key: string, value: FilterValue): void {
+    const normalized = Array.isArray(value) && value.length === 0 ? null : value;
+    this.filtersSignal.update((all) => ({
+      ...all,
+      [layerId]: { ...(all[layerId] ?? NO_FILTERS), [key]: normalized },
+    }));
+  }
+
+  /**
+   * Clears every filter on a layer.
+   *
+   * Usage: `state.clearFilters('stations');`
+   *
+   * @param layerId The layer's id.
+   */
+  clearFilters(layerId: string): void {
+    this.filtersSignal.update((all) => ({ ...all, [layerId]: NO_FILTERS }));
   }
 
   /**

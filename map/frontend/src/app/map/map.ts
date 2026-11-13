@@ -5,7 +5,8 @@
  * layer's features with `MapApi`. Markers come from `layers/markers.ts`, styled by
  * `layers/registry.ts`, and open a popup built from the layer's `popup_fields` and
  * `location_note`. Features with `muted: true` are greyed out. Nothing here knows which
- * layers exist. Each layer is redrawn whenever its filter values in `MapState` change.
+ * layers exist. Each layer is redrawn whenever its filter values in `MapState` change
+ * (set by `FilterPanel`), and an empty result shows a message over the map.
  * Zoom is capped at `MAX_ZOOM`, because the points are approximate.
  *
  * Usage: routed at `''` in `app.routes.ts`; rendered as `<map-map>`.
@@ -16,6 +17,7 @@ import {
   DestroyRef,
   ElementRef,
   afterNextRender,
+  computed,
   effect,
   inject,
   signal,
@@ -30,7 +32,9 @@ import { FeatureCollection, LayerManifest } from '../core/models';
 import { createMarker } from '../layers/markers';
 import { buildPopup } from '../layers/popup';
 import { styleFor } from '../layers/registry';
+import { FilterPanel } from '../filter-panel/filter-panel';
 import { StatusBadge } from '../status-badge/status-badge';
+import { emptyMessage } from './empty-message';
 
 /** Where the map starts, before any layer loads: Sitka, AK. */
 export const INITIAL_CENTER: L.LatLngExpression = [57.04907, -135.33905];
@@ -46,7 +50,7 @@ const FIT_MAX_ZOOM = 12;
 /** Map page: owns the Leaflet map and one feature group per drawn layer. */
 @Component({
   selector: 'map-map',
-  imports: [StatusBadge],
+  imports: [FilterPanel, StatusBadge],
   templateUrl: './map.html',
   styleUrl: './map.scss',
 })
@@ -61,6 +65,17 @@ export class MapView {
   private readonly drawn = new Map<string, L.FeatureGroup>();
   /** Whether the view has been fitted to features yet. */
   private fitted = false;
+
+  /** One message for each visible layer that loaded with no features. */
+  protected readonly emptyMessages = computed(() =>
+    this.state
+      .visibleLayers()
+      .filter((layer) => {
+        const load = this.state.layerLoads()[layer.id];
+        return load?.status === 'ready' && load.count === 0;
+      })
+      .map((layer) => emptyMessage(layer, this.state.filtersFor(layer.id))),
+  );
 
   /**
    * Creates the Leaflet map after first render, loads the manifest, and keeps each

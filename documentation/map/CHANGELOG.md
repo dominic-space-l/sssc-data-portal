@@ -3,6 +3,41 @@
 Versioning follows `xx.yy.zz` (see [documentation/CLAUDECODE/CLAUDE.md](../CLAUDECODE/CLAUDE.md)):
 `xx` = major feature, `yy` = steps/commits toward a major feature, `zz` = small updates and revisions.
 
+## 0.17.0 — 2026-11-13
+
+Map commit 13: station type and observation type filters. **Feature:** filter stations by type and by what they observe.
+- **Backend:** the stations layer has `station_type` ("Station type") and `observation_type` ("Observes") multiselect filters. Their options come from one `map_filter_options` call. Selected values are passed as `p_station_types` and `p_observation_types`, and unset filters aren't sent. `pyproject.toml` is at `0.17.0` (it had stayed at `0.14.0` through the frontend-only steps).
+- **Frontend:**
+  - `filter-panel/` renders a control for each filter in the manifest: a dropdown with "All" for a select, a checkbox list for a multiselect, and a checkbox for a boolean. It has a "Clear filters" button and no layer-specific code.
+  - `MapState` gains `setFilter` (an empty list means no filter) and `clearFilters`. `MapView` redraws when they change.
+  - An empty result shows "No stations match these filters."
+- **Tests:** 143 backend (from 135): filters → RPC params, invalid filters refused before any database call, and manifest options. 54 frontend (from 39): the filter panel's controls and values, `MapState` filters, the empty message, and `MapView` redrawing and showing the empty state.
+- **Checked live** against the local stack: each filter combination returned the expected seed stations.
+- **Also:** the 0.16.0 entry and the plan's step 12 note now record the hand check in a browser (the seeded stations showed up).
+
+**Files changed**
+- `map/backend/src/backend/layers/stations.py`
+- `map/backend/tests/test_stations.py`
+- `map/backend/pyproject.toml`
+- `map/backend/uv.lock`
+- `map/backend/README.md`
+- `map/frontend/src/app/core/map-state.ts`
+- `map/frontend/src/app/core/map-state.spec.ts`
+- `map/frontend/src/app/filter-panel/filter-panel.ts`
+- `map/frontend/src/app/filter-panel/filter-panel.html`
+- `map/frontend/src/app/filter-panel/filter-panel.scss`
+- `map/frontend/src/app/filter-panel/filter-panel.spec.ts`
+- `map/frontend/src/app/map/map.ts`
+- `map/frontend/src/app/map/map.html`
+- `map/frontend/src/app/map/map.scss`
+- `map/frontend/src/app/map/map.spec.ts`
+- `map/frontend/src/app/map/empty-message.ts`
+- `map/frontend/src/app/map/empty-message.spec.ts`
+- `map/frontend/README.md`
+- `map/README.md`
+- `documentation/map/map_app_plan.md`
+- `documentation/map/CHANGELOG.md`
+
 ## 0.16.0 — 2026-11-12
 
 Map commit 12: stations on the map as waypoints, with popups. **Feature:** stations show up at their masked locations, inactive ones greyed out, and show their name, code, and active status when clicked.
@@ -18,7 +53,7 @@ Map commit 12: stations on the map as waypoints, with popups. **Feature:** stati
   - `MapState`: loading, errors, visible layers, and filters
   - `StatusBadge`
   - styles, markers (including no markup injection), and popups
-- **Checked** with `npm run dev:map` against the local Supabase stack, through the dev proxy.
+- **Checked** with `npm run dev:map` against the local Supabase stack, through the dev proxy, and by hand in a browser: the seeded test stations show up on the map.
 - **Docs:** the map and frontend READMEs (quickstart: stations need the backend's Supabase settings; directory guides), and the plan's step 12 note.
 
 **Files changed**
