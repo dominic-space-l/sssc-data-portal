@@ -3,6 +3,26 @@
 Versioning follows `xx.yy.zz` (see [documentation/CLAUDECODE/CLAUDE.md](../CLAUDECODE/CLAUDE.md)):
 `xx` = major feature, `yy` = steps/commits toward a major feature, `zz` = small updates and revisions.
 
+## 0.20.0 — 2026-11-13
+
+Map commit 16: a project selects its managing organization. **Feature:** picking a project shows its stations, colored by the roles of the organization that runs it.
+- **Backend:** each project option `implies` its `organization_id`. A test checks that a project and its organization reach `map_stations` together, which filters by the project and colors by the organization.
+- **Frontend:** `MapState.setFilter` applies an option's `implies` and records what it set. Changing or clearing the project clears the organization it implied, unless the user has set the organization by hand since (even to the same one). The organization dropdown stays editable. `impliedBy(layerId)` exposes the records.
+- **Tests:** 150 backend (from 149). 83 frontend (from 74): implies applied, switched, and cleared, the user takeover, multiselect implies ignored, `clearFilters`, and the panel updating the organization dropdown.
+- **Checked live** against the local stack.
+
+**Files changed**
+- `map/backend/src/backend/layers/stations.py`
+- `map/backend/tests/test_stations.py`
+- `map/backend/pyproject.toml`
+- `map/backend/uv.lock`
+- `map/frontend/src/app/core/map-state.ts`
+- `map/frontend/src/app/core/map-state.spec.ts`
+- `map/frontend/src/app/filter-panel/filter-panel.spec.ts`
+- `map/frontend/README.md`
+- `documentation/map/map_app_plan.md`
+- `documentation/map/CHANGELOG.md`
+
 ## 0.19.0 — 2026-11-13
 
 Map commit 15: organization filter with role colors. **Feature:** pick an organization to see its stations, colored by its role at each one.

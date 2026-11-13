@@ -14,7 +14,7 @@
 
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { MapApi, describeApiError } from './map-api';
-import { ApiError, FilterValue, FilterValues, LayerManifest } from './models';
+import { ApiError, FilterOption, FilterValue, FilterValues, LayerManifest } from './models';
 
 /** Where a request stands. */
 export type LoadStatus = 'idle' | 'loading' | 'ready' | 'error';
@@ -32,6 +32,9 @@ export interface LayerLoad {
 
 const NO_FILTERS: FilterValues = {};
 
+/** For one layer: source filter key to the values it implied, by target filter key. */
+type ImpliedRecord = Record<string, Readonly<Record<string, number>>>;
+
 /** Holds the manifest, per-layer filter values, and loading and error state as signals. */
 @Injectable({ providedIn: 'root' })
 export class MapState {
@@ -42,6 +45,7 @@ export class MapState {
   private readonly manifestErrorSignal = signal<ApiError | null>(null);
   private readonly filtersSignal = signal<Readonly<Record<string, FilterValues>>>({});
   private readonly layerLoadsSignal = signal<Readonly<Record<string, LayerLoad>>>({});
+  private readonly impliedSignal = signal<Readonly<Record<string, ImpliedRecord>>>({});
 
   /** Every layer from the backend, or null until the manifest has loaded. */
   readonly manifest = this.manifestSignal.asReadonly();
@@ -93,9 +97,16 @@ export class MapState {
   }
 
   /**
-   * Sets one filter's value. `MapView` redraws the layer when its filters change.
+   * Sets one filter's value, as the user chose it, and applies the option's `implies`.
+   * `MapView` redraws the layer when its filters change.
    *
-   * Usage: `state.setFilter('stations', 'station_type', [1, 2]);`
+   * Implied values (a project setting its organization) are recorded against the filter
+   * that set them. When that filter changes or is cleared, the values it implied are
+   * cleared too, unless the user has set them by hand since: setting a filter yourself
+   * takes it over, even if you pick the same value. Only a select's option implies,
+   * since a multiselect has no single chosen option.
+   *
+   * Usage: `state.setFilter('stations', 'project', 4);` (also sets its organization)
    *
    * @param layerId The layer's id.
    * @param key The filter's key.
@@ -103,21 +114,91 @@ export class MapState {
    */
   setFilter(layerId: string, key: string, value: FilterValue): void {
     const normalized = Array.isArray(value) && value.length === 0 ? null : value;
-    this.filtersSignal.update((all) => ({
-      ...all,
-      [layerId]: { ...(all[layerId] ?? NO_FILTERS), [key]: normalized },
-    }));
+    const next: Record<string, FilterValue> = { ...this.filtersFor(layerId), [key]: normalized };
+    const implied = this.takeOver({ ...(this.impliedSignal()[layerId] ?? {}) }, key);
+
+    // Undo what this filter's previous value implied, where it's still in place.
+    for (const [target, impliedValue] of Object.entries(implied[key] ?? {})) {
+      if (next[target] === impliedValue) {
+        next[target] = null;
+      }
+    }
+    delete implied[key];
+
+    // Apply what the new value implies.
+    const implies = this.optionFor(layerId, key, normalized)?.implies;
+    if (implies && Object.keys(implies).length > 0) {
+      Object.assign(next, implies);
+      implied[key] = { ...implies };
+      for (const target of Object.keys(implies)) {
+        this.takeOver(implied, target, key);
+      }
+    }
+
+    this.impliedSignal.update((all) => ({ ...all, [layerId]: implied }));
+    this.filtersSignal.update((all) => ({ ...all, [layerId]: next }));
   }
 
   /**
-   * Clears every filter on a layer.
+   * Clears every filter on a layer, and what they implied.
    *
    * Usage: `state.clearFilters('stations');`
    *
    * @param layerId The layer's id.
    */
   clearFilters(layerId: string): void {
+    this.impliedSignal.update((all) => ({ ...all, [layerId]: {} }));
     this.filtersSignal.update((all) => ({ ...all, [layerId]: NO_FILTERS }));
+  }
+
+  /**
+   * Which values each filter has implied on a layer, by the filter that set them.
+   *
+   * Usage: `state.impliedBy('stations')` gives e.g. `{ project: { organization: 2 } }`.
+   *
+   * @param layerId The layer's id.
+   * @return Source filter key to the values it set, still in effect.
+   */
+  impliedBy(layerId: string): Readonly<Record<string, Readonly<Record<string, number>>>> {
+    return this.impliedSignal()[layerId] ?? {};
+  }
+
+  /**
+   * Removes a filter from every other filter's implied set, because its value now comes
+   * from somewhere else (the user, or another filter's implies).
+   *
+   * @param implied A layer's implied record, copied for editing. Changed in place.
+   * @param target The filter key being set.
+   * @param except A source to leave alone (the one setting it now).
+   * @return The same record.
+   */
+  private takeOver(implied: ImpliedRecord, target: string, except?: string): ImpliedRecord {
+    for (const [source, values] of Object.entries(implied)) {
+      if (source !== except && target in values) {
+        const rest = { ...values };
+        delete rest[target];
+        implied[source] = rest;
+      }
+    }
+    return implied;
+  }
+
+  /**
+   * Finds the chosen option of a select filter.
+   *
+   * @param layerId The layer's id.
+   * @param key The filter's key.
+   * @param value The value chosen.
+   * @return The option, or undefined if the filter isn't a select or has no such option.
+   */
+  private optionFor(layerId: string, key: string, value: FilterValue): FilterOption | undefined {
+    if (typeof value !== 'number') {
+      return undefined;
+    }
+    const filter = this.manifest()
+      ?.find((layer) => layer.id === layerId)
+      ?.filters.find((f) => f.key === key);
+    return filter?.type === 'select' ? filter.options?.find((o) => o.value === value) : undefined;
   }
 
   /**

@@ -179,6 +179,41 @@ describe('FilterPanel', () => {
     expect(tags).toEqual(['Retired']);
   });
 
+  it('choosing a project also selects its organization, which stays editable', async () => {
+    const withOrganization: LayerManifest = {
+      ...LAYER,
+      filters: [
+        {
+          key: 'project',
+          label: 'Project',
+          type: 'select',
+          options: [{ value: 1, label: 'Project Alpha', implies: { organization: 2 } }],
+        },
+        {
+          key: 'organization',
+          label: 'Organization',
+          type: 'select',
+          options: [
+            { value: 1, label: 'Test Org A' },
+            { value: 2, label: 'Test Org B' },
+          ],
+        },
+      ],
+    };
+    const { fixture, state } = await render([withOrganization]);
+    const [project, organization] = all<HTMLSelectElement>(fixture, 'select');
+
+    project.value = '1';
+    change(project);
+    await fixture.whenStable();
+    expect(organization.selectedOptions[0].textContent!.trim()).toBe('Test Org B');
+    expect(organization.disabled).toBe(false);
+
+    organization.value = '1';
+    change(organization);
+    expect(state.filtersFor('stations')).toEqual({ project: 1, organization: 1 });
+  });
+
   it('renders nothing when no visible layer has filters', async () => {
     const { fixture } = await render([{ ...LAYER, filters: [] }]);
     expect(all(fixture, 'details')).toEqual([]);

@@ -15,7 +15,8 @@ Properties of each feature:
              at the station ([] for none). The layer's style_by colors markers by it.
 
 Filters (query parameter -> map_stations parameter):
-    project            select      -> p_project (projects with no stations are hinted)
+    project            select      -> p_project (projects with no stations are hinted;
+                                      each implies its managing organization)
     organization       select      -> p_organization (filters only without a project;
                                       always sets the roles, see map_stations)
     station_type       multiselect -> p_station_types
@@ -79,15 +80,17 @@ def _id_name_options(items: Sequence[Mapping[str, Any]]) -> list[FilterOption]:
 
 
 def _project_options(projects: Sequence[Mapping[str, Any]]) -> list[FilterOption]:
-    """Turns map_filter_options projects into options, hinting those with no stations.
+    """Turns map_filter_options projects into options, with implies and hints.
 
     Args:
         projects: ``[{"id", "name", "organization_id", "station_count"}, ...]``, sorted
             by name.
 
     Returns:
-        One option per project, in the same order. Projects with a station count of
-        0 get the hint "No stations".
+        One option per project, in the same order. Each implies its managing
+        organization, so choosing a project colors its stations by that
+        organization's roles (map_stations then uses the organization for colors
+        only). Projects with a station count of 0 get the hint "No stations".
 
     Usage:
         _project_options(options["projects"])
@@ -96,6 +99,7 @@ def _project_options(projects: Sequence[Mapping[str, Any]]) -> list[FilterOption
         FilterOption(
             project["id"],
             project["name"],
+            implies={"organization": project["organization_id"]},
             hint=NO_STATIONS_HINT if project["station_count"] == 0 else None,
         )
         for project in projects

@@ -431,6 +431,16 @@ Each step adds its own pgTAP tests.
 - Frontend: `MapState.setFilter` applies `implies` and records which values it set. Clearing the project clears values it implied, unless the user has since changed them. The organization dropdown stays editable.
 - **Feature:** picking a project shows its stations, colored by the roles of the organization that runs it.
 
+> **Done (0.20.0).** What the implementation decided:
+> - **Backend:** every project option has `implies: {"organization": organization_id}`. A test checks that `?project=1&organization=1` sends both `p_project` and `p_organization`.
+> - **`MapState.setFilter`** records implied values against the filter that set them (`impliedBy(layerId)`):
+>   - **Changing or clearing the filter** first clears what its previous value implied, where that value is still in place, then applies what the new value implies.
+>   - **"Changed by the user" means touched:** setting a filter yourself takes it over, even with the same value, so the project no longer manages it. Comparing values alone would wrongly clear an organization the user deliberately re-picked.
+>   - **Clashing implies:** if a second filter implies the same target, it takes it over from the first.
+>   - **Scope:** only a select's chosen option implies (a multiselect has no single option). `clearFilters` forgets every record.
+> - **Panel:** picking a project updates the organization dropdown, which stays editable. Each change is one `MapState` update, so `MapView` makes one request with both parameters.
+> - **Checked live** on the local stack: the manifest's project options carry their organizations, and Alpha with Org A → 1 `[1, 3]`, 2 `[2]`.
+
 ### Wrap-up
 
 **17. Hardening — `0.21.0`**

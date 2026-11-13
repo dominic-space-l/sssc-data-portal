@@ -307,9 +307,14 @@ def test_manifest_filters_come_from_map_filter_options():
             "label": "Project",
             "type": "select",
             "options": [
-                {"value": 1, "label": "Project Alpha"},
-                {"value": 2, "label": "Project Beta"},
-                {"value": 3, "label": "Project Empty", "hint": "No stations"},
+                {"value": 1, "label": "Project Alpha", "implies": {"organization": 1}},
+                {"value": 2, "label": "Project Beta", "implies": {"organization": 2}},
+                {
+                    "value": 3,
+                    "label": "Project Empty",
+                    "implies": {"organization": 3},
+                    "hint": "No stations",
+                },
             ],
         },
         {
@@ -388,6 +393,21 @@ def test_roles_are_a_property_only_when_an_organization_is_chosen():
 
     plain = STATIONS.features(FakeDatabase({"map_stations": ROWS}), {})
     assert all("roles" not in f["properties"] for f in plain)
+
+
+def test_project_and_its_organization_are_passed_together():
+    """A project with its organization sends both parameters to map_stations.
+
+    map_stations then filters by the project and uses the organization for roles only.
+
+    Usage:
+        uv run pytest -k passed_together
+    """
+    db = FakeDatabase({"map_stations": ORG_ROWS[:2]})
+    response = _client(db).get("/api/layers/stations/features?project=1&organization=1")
+    assert response.status_code == 200
+    assert db.calls == [("map_stations", {"p_project": 1, "p_organization": 1})]
+    assert [f["properties"]["roles"] for f in response.get_json()["features"]] == [[1, 3], [2]]
 
 
 def test_project_select_takes_one_project():
