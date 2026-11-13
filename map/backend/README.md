@@ -28,7 +28,7 @@ Settings come from environment variables. In development, the backend also loads
 | --- | --- | --- |
 | `SUPABASE_URL` | none | Supabase API URL. For the local stack (`npm run db:start` from the repo root), `http://127.0.0.1:54321`. |
 | `SUPABASE_KEY` | none | The **anon (publishable)** key. For the local stack, `PUBLISHABLE_KEY` or `ANON_KEY` from `npx supabase status -o env`. |
-| `CACHE_MAX_AGE` | `300` | Seconds browsers and proxies may cache layer responses. `0` disables caching. |
+| `CACHE_MAX_AGE` | `300` | Seconds browsers and proxies may cache successful layer responses (`Cache-Control: public, max-age=...`). `0` makes them revalidate every time. Errors and `/api/health` are never cached. |
 
 The backend refuses to start, with an error naming the variable, if:
 - `SUPABASE_URL` doesn't start with `http://` or `https://`
@@ -84,11 +84,29 @@ SUPABASE_URL=https://<ref>.supabase.co SUPABASE_KEY=<anon key> uv run python scr
 
 It prints only pass/fail lines and counts. It exits 0 if all checks pass, 1 if any fail, and 2 if Supabase isn't configured or the key is a service-role key. Run it against the hosted project after any change to grants, policies, or the map functions.
 
+**Checking the masking end to end:** `--check-coordinates` adds a comparison of what the public map serves with the true station locations:
+
+```sh
+uv run python scripts/smoke_supabase.py --check-coordinates   # prompts for the service-role key
+```
+
+It **prompts** for the service-role key (from **Project Settings → API Keys**, or `SERVICE_ROLE_KEY` from `npx supabase status -o env` locally). Don't pass the key as an argument or keep it in `.env`. The script uses it only to read `Stations`' true coordinates. It then requests the real `/api/layers/stations/features` route with the anon key, in-process, and checks three things:
+- every served station exists
+- no point equals its true location to 4 decimal places
+- every point is 235–515 m away: the 250–500 m masking band, plus rounding slack
+
+It prints only counts and the smallest and largest offsets.
+
 ## Testing
 ```sh
 uv run pytest
 uv run ruff check && uv run ruff format --check   # lint and format, as CI runs them
+
+# Integration tests: the real app against a real Supabase project (local or hosted).
+SUPABASE_URL=http://127.0.0.1:54321 SUPABASE_KEY=<anon key> uv run pytest -m integration
 ```
+
+Integration tests (`tests/test_integration.py`, marked `integration`) are deselected by default, and skipped unless `SUPABASE_URL` and `SUPABASE_KEY` are set in the environment. They don't read `.env`. They assume nothing about the data beyond the API contract, so they work against the hosted project too. CI doesn't run them.
 
 Tests never read your `.env` or environment: fixtures in `tests/conftest.py` build the app with an explicit `Config`, and the tests of environment loading use a temporary `.env` and restore the environment afterwards.
 
@@ -104,10 +122,12 @@ Tests never read your `.env` or environment: fixtures in `tests/conftest.py` bui
 | `src/backend/api.py` | The `/api` Blueprint: every route |
 | `src/backend/db.py` | `Database` protocol, `SupabaseDatabase` (timeout, error translation), `get_database` |
 | `src/backend/errors.py` | JSON error handlers |
+| `src/backend/http_hooks.py` | `Cache-Control` (public `max-age=CACHE_MAX_AGE` on successful layer responses, `no-store` for everything else) and one log line per request |
 | `src/backend/layers/__init__.py` | `REGISTRY` of layers, plus `get_layer` and `get_layers` |
 | `src/backend/layers/base.py` | The `Layer` protocol, manifest and detail types, filter parsing, GeoJSON helpers |
 | `src/backend/layers/stations.py` | The stations layer: `map_stations` rows as display-ready, masked point features |
 | `scripts/smoke_supabase.py` | Checks the anon key's access on a real Supabase project |
 | `tests/conftest.py` | Shared fixtures: `app` and `client` with no Supabase configured, and `clean_env` |
 | `tests/fakes.py` | `FakeDatabase` (canned rpc results) and `FakeLayer` (one filter of each type) |
+| `tests/test_integration.py` | Integration tests against a real Supabase project (`-m integration`) |
 | `tests/` | pytest tests |

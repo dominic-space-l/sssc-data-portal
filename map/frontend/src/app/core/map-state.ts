@@ -46,6 +46,7 @@ export class MapState {
   private readonly filtersSignal = signal<Readonly<Record<string, FilterValues>>>({});
   private readonly layerLoadsSignal = signal<Readonly<Record<string, LayerLoad>>>({});
   private readonly impliedSignal = signal<Readonly<Record<string, ImpliedRecord>>>({});
+  private readonly reloadsSignal = signal(0);
 
   /** Every layer from the backend, or null until the manifest has loaded. */
   readonly manifest = this.manifestSignal.asReadonly();
@@ -57,6 +58,8 @@ export class MapState {
   readonly filters = this.filtersSignal.asReadonly();
   /** Load status of each layer's features, by layer id. */
   readonly layerLoads = this.layerLoadsSignal.asReadonly();
+  /** Bumped by `reload()`. `MapView` re-fetches the visible layers when it changes. */
+  readonly reloads = this.reloadsSignal.asReadonly();
 
   /** The layers drawn on the map: those marked `default_visible`. */
   readonly visibleLayers = computed(() =>
@@ -81,6 +84,16 @@ export class MapState {
         this.manifestStatusSignal.set('error');
       },
     });
+  }
+
+  /**
+   * Asks `MapView` to fetch every visible layer again, keeping the filters. Used by the
+   * error state's Retry button.
+   *
+   * Usage: `state.reload();`
+   */
+  reload(): void {
+    this.reloadsSignal.update((count) => count + 1);
   }
 
   /**

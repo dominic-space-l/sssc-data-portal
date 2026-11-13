@@ -8,7 +8,8 @@
  * `style_by` is active, markers are colored by it (`layers/style-by.ts`), and `Legend`
  * explains the colors. Nothing here knows which
  * layers exist. Each layer is redrawn whenever its filter values in `MapState` change
- * (set by `FilterPanel`), and an empty result shows a message over the map.
+ * (set by `FilterPanel`). An empty result shows a message over the map, and a failure
+ * (backend down, masking unavailable) shows an error with a Retry button.
  * Zoom is capped at `MAX_ZOOM`, because the points are approximate.
  *
  * Usage: routed at `''` in `app.routes.ts`; rendered as `<map-map>`.
@@ -39,6 +40,7 @@ import { Legend } from '../legend/legend';
 import { FilterPanel } from '../filter-panel/filter-panel';
 import { StatusBadge } from '../status-badge/status-badge';
 import { emptyMessage } from './empty-message';
+import { layerErrorMessage, manifestErrorMessage } from './error-message';
 
 /** Where the map starts, before any layer loads: Sitka, AK. */
 export const INITIAL_CENTER: L.LatLngExpression = [57.04907, -135.33905];
@@ -69,6 +71,23 @@ export class MapView {
   private readonly drawn = new Map<string, L.FeatureGroup>();
   /** Whether the view has been fitted to features yet. */
   private fitted = false;
+
+  /**
+   * What went wrong, if anything: the manifest failing, or each visible layer that
+   * failed to load (server unreachable, masking unavailable, ...).
+   */
+  protected readonly errors = computed(() => {
+    const manifestError = this.state.manifestError();
+    if (this.state.manifestStatus() === 'error' && manifestError) {
+      return [{ id: 'manifest', text: manifestErrorMessage(manifestError) }];
+    }
+    return this.state.visibleLayers().flatMap((layer) => {
+      const load = this.state.layerLoads()[layer.id];
+      return load?.status === 'error' && load.error
+        ? [{ id: layer.id, text: layerErrorMessage(layer, load.error) }]
+        : [];
+    });
+  });
 
   /** One message for each visible layer that loaded with no features. */
   protected readonly emptyMessages = computed(() =>
@@ -106,15 +125,30 @@ export class MapView {
 
     this.state.loadManifest();
 
-    // Reruns when the map is created, the manifest loads, or a layer's filters change.
+    // Reruns when the map is created, the manifest loads, a layer's filters change, or
+    // the user retries after an error.
     effect((onCleanup) => {
       const map = this.map();
+      this.state.reloads();
       if (!map) {
         return;
       }
       const subscriptions = this.state.visibleLayers().map((layer) => this.loadLayer(map, layer));
       onCleanup(() => subscriptions.forEach((subscription) => subscription.unsubscribe()));
     });
+  }
+
+  /**
+   * Retries whatever failed: the manifest, or the visible layers.
+   *
+   * Usage: bound to the error state's Retry button.
+   */
+  protected retry(): void {
+    if (this.state.manifestStatus() === 'error') {
+      this.state.loadManifest();
+    } else {
+      this.state.reload();
+    }
   }
 
   /**
@@ -138,6 +172,9 @@ export class MapView {
           });
         },
         error: (err: unknown) => {
+          // Don't leave markers from an earlier request under the error message.
+          this.drawn.get(layer.id)?.remove();
+          this.drawn.delete(layer.id);
           this.state.setLayerLoad(layer.id, { status: 'error', error: describeApiError(err) });
         },
       });

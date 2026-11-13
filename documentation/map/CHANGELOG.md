@@ -3,6 +3,39 @@
 Versioning follows `xx.yy.zz` (see [documentation/CLAUDECODE/CLAUDE.md](../CLAUDECODE/CLAUDE.md)):
 `xx` = major feature, `yy` = steps/commits toward a major feature, `zz` = small updates and revisions.
 
+## 0.21.0 — 2026-11-13
+
+Map commit 17: hardening.
+- **Caching:** successful layer responses (manifest, features, detail) send `Cache-Control: public, max-age=CACHE_MAX_AGE` (default 300). Health and every error send `no-store`, so a temporary 503 is never cached.
+- **Request logging:** one line per request: method, path with query, status, and duration.
+- **Integration tests:** 7 tests against a real Supabase project, run with `SUPABASE_URL=... SUPABASE_KEY=<anon> uv run pytest -m integration`. They're deselected by default, read only the environment, and assume nothing about the data. They passed against the local stack.
+- **Smoke script:** `--check-coordinates` prompts for the service-role key, which is never an argument or stored, and checks that no point the live features route serves is at its true location, and that each is 250–500 m from it (235–515 m with rounding). Locally: offsets 271–348 m.
+- **Frontend error state:** when the backend is down, the manifest or a layer fails, or masking is unavailable (503), a message over the map says what failed and why, with a Retry button. A failed reload clears that layer's old markers.
+- **Tests:** 161 backend unit tests (from 150), plus 7 integration tests. 89 frontend (from 83): the error messages, Retry for a layer and for the manifest, clearing stale markers, and `MapState.reload`.
+- **pytest:** ignores the two deprecation warnings supabase-py 2.33 triggers in postgrest-py for every client (`timeout`, `verify`). They can't be avoided from our side.
+- **Checked live** on the dev server: each route's `Cache-Control`, including a `no-store` 503 with the Vault secret renamed, and the request log.
+
+**Files changed**
+- `map/backend/src/backend/http_hooks.py`
+- `map/backend/src/backend/__init__.py`
+- `map/backend/scripts/smoke_supabase.py`
+- `map/backend/tests/test_http_hooks.py`
+- `map/backend/tests/test_integration.py`
+- `map/backend/pyproject.toml`
+- `map/backend/uv.lock`
+- `map/backend/README.md`
+- `map/frontend/src/app/core/map-state.ts`
+- `map/frontend/src/app/core/map-state.spec.ts`
+- `map/frontend/src/app/map/map.ts`
+- `map/frontend/src/app/map/map.html`
+- `map/frontend/src/app/map/map.scss`
+- `map/frontend/src/app/map/map.spec.ts`
+- `map/frontend/src/app/map/error-message.ts`
+- `map/frontend/src/app/map/error-message.spec.ts`
+- `map/frontend/README.md`
+- `documentation/map/map_app_plan.md`
+- `documentation/map/CHANGELOG.md`
+
 ## 0.20.1 — 2026-11-13
 
 Plan update before the wrap-up.

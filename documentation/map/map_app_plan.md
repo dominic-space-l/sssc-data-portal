@@ -449,6 +449,27 @@ Each step adds its own pgTAP tests.
 - `smoke_supabase.py`: run with a service-role key supplied on the command line (never stored in config), it checks that no point from the live features route matches a true station location to 4 decimal places, and that every point is 250–500 m from its station.
 - Frontend: a visible error state when the backend is down, a layer fails to load, or masking isn't configured (503).
 
+> **Done (0.21.0).** What the implementation decided:
+> - **Caching** (`http_hooks.py`): a `200` from the three layer routes gets `Cache-Control: public, max-age=CACHE_MAX_AGE`. Everything else, including `/api/health` and **every error**, gets `no-store`, so a 503 during a masking outage can't be cached past the fix. Each filter combination is its own URL, so caching never mixes filters. No ETags yet.
+> - **Request logging:** one INFO line per request on `backend.requests`: method, path with query, status, and duration. Filters aren't sensitive, and no keys appear in URLs.
+> - **Integration tests** (`tests/test_integration.py`): 7 tests, deselected by default (`addopts = -m "not integration"`) and skipped unless `SUPABASE_URL` and `SUPABASE_KEY` are in the environment. They don't read `.env`. They're data-agnostic so they run against the hosted project too. They cover:
+>   - the manifest's four filters
+>   - masked, rounded points with only public properties, stable across requests
+>   - hinted projects are exactly the empty ones
+>   - project + implied organization gives sorted roles
+>   - detail and 404, and a `no-store` 400
+>
+>   7/7 passed on the local stack.
+> - **Upstream warnings:** supabase-py 2.33 always passes `timeout` and `verify` to postgrest-py, which warns that both are deprecated. It can't be avoided from our side (passing our own `httpx.Client` would replace postgrest's base-URL session), so pytest ignores exactly those two warnings, with a comment. The timeout still applies.
+> - **`smoke_supabase.py --check-coordinates`** **prompts** for the service-role key (`getpass`) instead of taking it as an argument, so it never lands in shell history or the process list. It reads `Stations`' true coordinates with it, requests the real features route in-process with the anon key, and checks:
+>   - every served id exists
+>   - none is at its true location to 4 decimal places
+>   - each is 235–515 m away (haversine, about 0.5% from the ellipsoidal distance)
+>
+>   Locally: 10/10, offsets 271–348 m, matching S4. With the anon key typed instead, it fails with "is this the service-role key?". The key never appears in the output.
+> - **Error state:** a `role="alert"` box at the top center reads "*Stations* couldn't be loaded." plus the backend's message (for example "Station locations are temporarily unavailable."), or "The map couldn't load its layers." for a manifest failure. A **Retry** button reloads the manifest, or every visible layer via `MapState.reload()`. A failed reload removes that layer's old markers, so stale stations never show under an error.
+> - **Checked live** on the dev server: headers as above for health, the manifest, features, detail, a 400, and a 503 with the Vault secret renamed (restored afterwards), and the request log lines.
+
 **18. Documentation — `1.0.0`**
 - `documentation/map/api.md`: the API contract, including `implies`, `hint`, `style_by`, and masking guarantees.
 - `documentation/map/adding_a_layer.md`: a step-by-step guide to adding a layer or changing its fields, filters, and colors, including how to source points from a masking function.

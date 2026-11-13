@@ -34,7 +34,7 @@ npm test -w map-frontend         # Vitest unit tests
 | `src/main.ts` | Browser entry point |
 | `src/styles.scss` | Global styles |
 | `src/app/` | Root component (`app.ts`), routes (`app.routes.ts`), providers (`app.config.ts`) |
-| `src/app/map/` | `MapView`: the Leaflet map. Draws each visible layer from the manifest, redraws it when its filters change, and shows an empty-state message (`empty-message.ts`). Zoom is capped at 14. |
+| `src/app/map/` | `MapView`: the Leaflet map. Draws each visible layer from the manifest, redraws it when its filters change, and shows an empty-state message (`empty-message.ts`) or an error with a Retry button (`error-message.ts`). Zoom is capped at 14. |
 | `src/app/core/` | `models.ts`: types for the API contract. `map-api.ts`: `MapApi` (health, layers, features, detail), `filterParams`, and `describeApiError`. `map-state.ts`: `MapState`, the shared signals (manifest, filter values, load status). `setFilter` applies an option's `implies` (a project sets its organization) and undoes it when that filter changes, unless the user has set the implied filter by hand. |
 | `src/app/layers/` | How layers look: `registry.ts` (marker style per layer id, with a default, and the Okabe–Ito `style_by` palette), `style-by.ts` (when `style_by` coloring applies and each feature's colors), `markers.ts` (SVG marker factory: solid, pie, and muted), `popup.ts` (popup built from the manifest's `popup_fields`) |
 | `src/app/legend/` | `Legend`: the `style_by` colors while active, and the muted label when muted markers are drawn |
