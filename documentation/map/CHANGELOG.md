@@ -3,6 +3,31 @@
 Versioning follows `xx.yy.zz` (see [documentation/CLAUDECODE/CLAUDE.md](../CLAUDECODE/CLAUDE.md)):
 `xx` = major feature, `yy` = steps/commits toward a major feature, `zz` = small updates and revisions.
 
+## 0.11.0 — 2026-11-12
+
+Map commit 7: backend config and dependencies.
+- **Config:** `backend/config.py` adds a frozen `Config` with `supabase_url`, `supabase_key`, and `cache_max_age` (default 300 s), read from `SUPABASE_URL`, `SUPABASE_KEY`, and `CACHE_MAX_AGE`. In development it also loads `map/backend/.env`, and real environment variables win. Missing or blank Supabase settings are allowed, so the app boots and `/api/health` still works.
+- **Refused at startup:** a `CACHE_MAX_AGE` that isn't a whole number of seconds or is negative, a `SUPABASE_URL` without `http(s)://`, and any service-role or secret key (`sb_secret_…`, or a JWT with `role: service_role`). The map backend must only use the anon key.
+- **App factory:** `create_app(config=None)` stores the Config in `app.config["MAP_CONFIG"]`, and `get_config()` returns it. With no Config, it reads the environment.
+- **Dependencies:** added `python-dotenv`, and moved `pytest` into the `dev` group (now 9.2.0). `pyproject.toml` is at `0.11.0` to match this changelog, with a real description.
+- **`.env.example`:** the three variables, with local-stack defaults and a warning to use only the anon key.
+- **Tests:** 29 (from 1). `conftest.py` builds apps with an explicit `Config`, so tests never read a real `.env`. A `clean_env` fixture unsets and restores the variables. New tests cover defaults, whitespace and blanks, validation, accepted and refused keys, `.env` loading with the environment winning, a missing `.env`, and `create_app` with and without a Config. Checked by hand: the dev server starts unconfigured and answers health, and refuses to start with a secret key.
+- **Docs:** `map/backend/README.md` has a Configuration section and an updated directory guide. `map/README.md` has a Configuration section. The plan's step 7 notes what was decided.
+
+**Files changed**
+- `map/backend/src/backend/__init__.py`
+- `map/backend/src/backend/config.py`
+- `map/backend/.env.example`
+- `map/backend/tests/conftest.py`
+- `map/backend/tests/test_config.py`
+- `map/backend/tests/test_health.py`
+- `map/backend/pyproject.toml`
+- `map/backend/uv.lock`
+- `map/backend/README.md`
+- `map/README.md`
+- `documentation/map/map_app_plan.md`
+- `documentation/map/CHANGELOG.md`
+
 ## 0.10.1 — 2026-11-12
 
 `supabase/README.md` now points developers who are new to the database to the new [deployment guide](../deployment_guide.md). That guide is logged in the portal and authentication changelogs.

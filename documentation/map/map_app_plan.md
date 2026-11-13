@@ -295,6 +295,13 @@ Each step adds its own pgTAP tests.
 - `config.py`: a `Config` dataclass (`SUPABASE_URL`, `SUPABASE_KEY`, `CACHE_MAX_AGE`) loaded from the environment. Missing values do not prevent the app from booting, so `/api/health` still works.
 - `create_app(config=None)`; add `.env.example`.
 
+> **Done (0.11.0).** What the implementation decided:
+> - `Config` is a frozen dataclass with lowercase fields (`supabase_url`, `supabase_key`, `cache_max_age`), read from the three variables. `create_app` stores it in `app.config["MAP_CONFIG"]`, and `backend.get_config()` returns it inside a request. `is_database_configured` tells commit 8 whether to create the `Database`.
+> - `.env` is loaded from the fixed path `map/backend/.env` only when `create_app()` gets no `Config`, and real environment variables win. Tests always pass a `Config`, so a developer's `.env` can't affect them.
+> - **Missing means unset, malformed means refuse.** Blank values count as missing. A non-numeric or negative `CACHE_MAX_AGE`, or a `SUPABASE_URL` without `http(s)://`, stops startup with an error naming the variable.
+> - **Service-role keys are refused.** A `SUPABASE_KEY` starting with `sb_secret_`, or a JWT whose role is `service_role`, stops startup. This enforces the "service-role key is never on this server" decision against a wrong paste into `.env`. The JWT is only decoded, not verified.
+> - `CACHE_MAX_AGE` defaults to 300 seconds. Commit 17 uses it.
+
 **8. Database access, errors, and blueprint — `0.12.0`**
 - `db.py`: a `Database` class wrapping the Supabase client, with `rpc(name, params)` and a request timeout. Supabase failures are raised as `UpstreamError`. The "location masking is not configured" error (`P0001`) is raised as `MaskingUnavailable`. It is created lazily and stored in `app.extensions`.
 - `errors.py`: JSON 400, 404, and 500 responses, with `UpstreamError` → 502 and `MaskingUnavailable` → 503. Details are logged on the server only.
