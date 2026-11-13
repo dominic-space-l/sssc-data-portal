@@ -3,6 +3,46 @@
 Versioning follows `xx.yy.zz` (see [documentation/CLAUDECODE/CLAUDE.md](../CLAUDECODE/CLAUDE.md)):
 `xx` = major feature, `yy` = steps/commits toward a major feature, `zz` = small updates and revisions.
 
+## 0.16.0 — 2026-11-12
+
+Map commit 12: stations on the map as waypoints, with popups. **Feature:** stations show up at their masked locations, inactive ones greyed out, and show their name, code, and active status when clicked.
+- **`core/map-state.ts`:** `MapState` holds signals for the manifest and its load status, filter values by layer, and each layer's load status (count or error). `visibleLayers` lists the `default_visible` layers.
+- **`map/` (`MapView`):** loads the manifest, then fetches and draws each visible layer. It redraws a layer when its filters change, and cancels in-flight requests. It fits the view to the first features drawn. Zoom is capped at 14, because the points are approximate. The placeholder Sitka marker is gone.
+- **`layers/registry.ts`:** a marker style per layer id (stations navy), with a default for any other layer.
+- **`layers/markers.ts`:** keyboard-focusable SVG markers with a title. Muted features are drawn at 50% opacity with a gray outline.
+- **`layers/popup.ts`:** the popup lists the layer's `popup_fields` with their values, then "Approximate location". It's built as text nodes, so database values can't inject markup.
+- **`status-badge/`:** the backend health badge, now its own component, with `role="status"`.
+- **Removed:** Leaflet's default-icon setup and `src/assets.d.ts`, which are no longer needed.
+- **Tests:** 39 frontend tests (from 15):
+  - `MapView` with a fake API and a real Leaflet map in jsdom: markers per visible layer, muting, popup on click, the zoom cap, and a failed load recorded with no markers
+  - `MapState`: loading, errors, visible layers, and filters
+  - `StatusBadge`
+  - styles, markers (including no markup injection), and popups
+- **Checked** with `npm run dev:map` against the local Supabase stack, through the dev proxy.
+- **Docs:** the map and frontend READMEs (quickstart: stations need the backend's Supabase settings; directory guides), and the plan's step 12 note.
+
+**Files changed**
+- `map/frontend/src/app/core/map-state.ts`
+- `map/frontend/src/app/core/map-state.spec.ts`
+- `map/frontend/src/app/layers/registry.ts`
+- `map/frontend/src/app/layers/markers.ts`
+- `map/frontend/src/app/layers/popup.ts`
+- `map/frontend/src/app/layers/layers.spec.ts`
+- `map/frontend/src/app/map/map.ts`
+- `map/frontend/src/app/map/map.html`
+- `map/frontend/src/app/map/map.scss`
+- `map/frontend/src/app/map/map.spec.ts`
+- `map/frontend/src/app/status-badge/status-badge.ts`
+- `map/frontend/src/app/status-badge/status-badge.html`
+- `map/frontend/src/app/status-badge/status-badge.scss`
+- `map/frontend/src/app/status-badge/status-badge.spec.ts`
+- `map/frontend/src/styles.scss`
+- `map/frontend/src/assets.d.ts` (deleted)
+- `map/frontend/README.md`
+- `map/README.md`
+- `documentation/map/map_app_plan.md`
+- `documentation/map/CHANGELOG.md`
+
 ## 0.15.0 — 2026-11-12
 
 Map commit 11: frontend models and API client.

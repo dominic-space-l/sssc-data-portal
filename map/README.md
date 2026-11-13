@@ -18,8 +18,10 @@
 | `backend/.env.example` | Template for the backend's local settings (`.env`) |
 | `backend/tests/` | pytest tests |
 | `frontend/` | Angular + Leaflet app. See [frontend/README.md](frontend/README.md). |
-| `frontend/src/app/map/` | The Leaflet map page |
-| `frontend/src/app/core/` | API types (`models.ts`) and the HTTP client for the backend (`map-api.ts`) |
+| `frontend/src/app/map/` | The Leaflet map page: draws every visible layer from the manifest |
+| `frontend/src/app/core/` | API types (`models.ts`), the HTTP client (`map-api.ts`), and shared state (`map-state.ts`) |
+| `frontend/src/app/layers/` | Marker styles per layer, the marker factory, and popups |
+| `frontend/src/app/status-badge/` | The backend health badge |
 | `frontend/proxy.conf.json` | Dev proxy: `/api/*` → backend on port 5001 |
 
 Planning docs and the changelog live in [`documentation/map/`](../documentation/map/).
@@ -35,7 +37,9 @@ npm install        # installs frontend deps for every app (npm workspaces)
 npm run dev:map    # starts the Flask API and the Angular dev server together
 ```
 
-Open http://localhost:4200. You should see a Leaflet map, and the bottom-right badge should read `backend: ok`.
+Open http://localhost:4200. You should see a Leaflet map with the stations as waypoints (inactive ones greyed out), and the bottom-right badge should read `backend: ok`. Click a station for its name, code, and status.
+
+The stations come from Supabase, so the backend needs `SUPABASE_URL` and `SUPABASE_KEY` (the anon key) in `backend/.env`. See [backend/README.md](backend/README.md#configuration). For local development, start the local database first (`npm run db:start`) and use its URL and key. Without them, the map still loads, but with no stations.
 
 To run each side on its own:
 

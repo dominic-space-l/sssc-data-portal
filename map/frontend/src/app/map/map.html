@@ -1,4 +1,2 @@
 <div #map class="map"></div>
-<div class="status" [class.down]="backendStatus() === 'unreachable'">
-  backend: {{ backendStatus() }}
-</div>
+<map-status-badge class="status" />

@@ -377,6 +377,16 @@ Each step adds its own pgTAP tests.
 - Remove the placeholder Sitka marker, and pull the status badge out into `status-badge/`.
 - **Feature:** stations show up as waypoints, inactive ones greyed out, and present their name, code, and active status when clicked.
 
+> **Done (0.16.0).** What the implementation decided:
+> - **`MapState`** holds read-only signals for `manifest`, `manifestStatus`/`manifestError`, `filters` (by layer id, read with `filtersFor`), and `layerLoads` (each layer's `status`, `count`, or `ApiError`). `visibleLayers` is computed from `default_visible`. Nothing writes filters yet. Step 13's filter panel will.
+> - **`MapView` redraws from an `effect`** over the map, the visible layers, and each layer's filters. Step 13's filter changes therefore redraw with no new wiring, and a newer request cancels an in-flight one. The view fits the first features drawn (up to zoom 12) and keeps the user's view on later redraws. `maxZoom` is 14 on the map and the tile layer.
+> - **Markers are `L.marker`s with an inline-SVG `divIcon`** (`layers/markers.ts`), not `circleMarker`s, so they're keyboard-focusable, carry a `title`, and step 15's pies can reuse the same SVG approach. Only style constants go into the SVG markup. Muted markers are drawn at 50% opacity with a gray (`#757575`) outline, keeping their fill. A focus ring is styled globally.
+> - **Points are drawn into an `L.featureGroup`**, not with `L.geoJSON`. The API types are point-only and read-only, and Leaflet's GeoJSON types would need an unsafe cast. A future polygon layer would add a branch in `draw()`.
+> - **Popups are built from DOM nodes with `textContent`** (`layers/popup.ts`), never HTML strings. A station name with markup renders as text. Missing values show `—`.
+> - **`StatusBadge`** (`status-badge/`) is now its own component, with `role="status"`. The placeholder Sitka marker, Leaflet's default-icon setup, and `src/assets.d.ts` (PNG imports) are removed.
+> - **Errors** are recorded in `MapState` (`layerLoads[...].error`, `manifestError`) but not shown yet. Step 17 adds the visible error state.
+> - **Checked** with `npm run dev:map` against the local Supabase stack: the page, health, manifest, and 4 stations (station 3 muted) all served through the dev proxy. No headless browser was available, so the rendered map itself was checked only in jsdom tests.
+
 ### Filtering and coloring
 
 **13. Station type and observation type filters — `0.17.0`**
