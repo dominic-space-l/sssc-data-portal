@@ -4,7 +4,8 @@ Role: defines the app factory and the dev-server entry point for the map
 backend. The Angular dev server proxies ``/api/*`` here (see
 ``map/frontend/proxy.conf.json``). Settings come from ``backend.config``, routes
 from ``backend.api``, database access from ``backend.db``, and JSON error
-responses from ``backend.errors``.
+responses from ``backend.errors``, and caching headers and request logging from
+``backend.http_hooks``.
 
 Usage:
     uv run backend            # from map/backend/, or `npm run backend:map` from the repo root
@@ -19,6 +20,7 @@ from backend.api import api
 from backend.config import CONFIG_KEY, Config
 from backend.db import Database, init_database
 from backend.errors import register_error_handlers
+from backend.http_hooks import init_http
 from backend.layers import init_layers
 from backend.layers.base import Layer
 
@@ -61,6 +63,7 @@ def create_app(
     init_database(app, database)
     init_layers(app, layers)
     register_error_handlers(app)
+    init_http(app)
     app.register_blueprint(api)
     return app
 

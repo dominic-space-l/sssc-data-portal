@@ -1,6 +1,6 @@
 [project]
 name = "backend"
-version = "0.20.0"
+version = "1.0.0"
 description = "Flask API that serves masked environmental monitoring station data to the map frontend."
 readme = "README.md"
 authors = [
@@ -39,3 +39,13 @@ convention = "google"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# Integration tests call a real Supabase project, so they only run when asked for:
+#   SUPABASE_URL=... SUPABASE_KEY=<anon key> uv run pytest -m integration
+addopts = ["-m", "not integration"]
+markers = ["integration: needs a real Supabase project (SUPABASE_URL and SUPABASE_KEY)"]
+# supabase-py 2.33 always passes `timeout` and `verify` to postgrest-py, which warns
+# that both are deprecated. It isn't avoidable from our side, and the timeout still
+# applies (checked in map commit 8). Remove this when supabase-py stops passing them.
+filterwarnings = [
+    "ignore:The '(timeout|verify)' parameter is deprecated:DeprecationWarning",
+]

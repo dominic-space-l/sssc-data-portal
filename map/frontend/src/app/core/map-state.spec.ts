@@ -204,6 +204,14 @@ describe('MapState', () => {
     });
   });
 
+  it('counts reloads, so MapView can fetch again', () => {
+    const state = stateWith(of([]));
+    expect(state.reloads()).toBe(0);
+    state.reload();
+    state.reload();
+    expect(state.reloads()).toBe(2);
+  });
+
   it('records each layer load separately', () => {
     const state = stateWith(of([]));
     state.setLayerLoad('stations', { status: 'loading' });

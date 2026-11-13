@@ -59,6 +59,8 @@ class FakeMapApi {
   readonly filtersRequested: FilterValues[] = [];
   /** Set to change what later `features()` calls return. */
   next$: Observable<FeatureCollection> | null = null;
+  /** Set to change what `layers()` returns. */
+  layers$: Observable<readonly LayerManifest[]> | null = null;
 
   /**
    * @param manifest The layers `layers()` returns.
@@ -74,9 +76,9 @@ class FakeMapApi {
     return of({ status: 'ok' });
   }
 
-  /** @return The manifest. */
+  /** @return The manifest (`layers$` if set). */
   layers() {
-    return of(this.manifest);
+    return this.layers$ ?? of(this.manifest);
   }
 
   /**
@@ -265,6 +267,70 @@ describe('MapView', () => {
     expect(
       (fixture.nativeElement as HTMLElement).querySelector('map-filter-panel details'),
     ).not.toBeNull();
+  });
+
+  it('shows a layer error with Retry, which loads the layer again', async () => {
+    const failure = new HttpErrorResponse({
+      status: 503,
+      error: {
+        error: {
+          code: 'masking_unavailable',
+          message: 'Station locations are temporarily unavailable.',
+        },
+      },
+    });
+    const api = new FakeMapApi(
+      [STATIONS],
+      throwError(() => failure),
+    );
+    const fixture = await render(api);
+    const element = fixture.nativeElement as HTMLElement;
+
+    expect(element.querySelector('[role=alert] .error p')!.textContent).toBe(
+      "Stations couldn't be loaded. Station locations are temporarily unavailable.",
+    );
+
+    api.next$ = of(FEATURES);
+    element.querySelector<HTMLButtonElement>('.error button')!.click();
+    await fixture.whenStable();
+
+    expect(api.requested).toEqual(['stations', 'stations']);
+    expect(element.querySelector('.error')).toBeNull();
+    expect(markers(fixture).length).toBe(2);
+  });
+
+  it('removes markers from an earlier load when a reload fails', async () => {
+    const api = new FakeMapApi([STATIONS], of(FEATURES));
+    const fixture = await render(api);
+    expect(markers(fixture).length).toBe(2);
+
+    api.next$ = throwError(() => new HttpErrorResponse({ status: 0 }));
+    TestBed.inject(MapState).setFilter('stations', 'station_type', [1]);
+    await fixture.whenStable();
+
+    expect(markers(fixture)).toEqual([]);
+    expect((fixture.nativeElement as HTMLElement).querySelector('.error p')!.textContent).toBe(
+      "Stations couldn't be loaded. The map server could not be reached.",
+    );
+  });
+
+  it('shows a manifest error with Retry, which loads the manifest again', async () => {
+    const api = new FakeMapApi([STATIONS], of(FEATURES));
+    api.layers$ = throwError(() => new HttpErrorResponse({ status: 0 }));
+    const fixture = await render(api);
+    const element = fixture.nativeElement as HTMLElement;
+
+    expect(element.querySelector('.error p')!.textContent).toBe(
+      "The map couldn't load its layers. The map server could not be reached.",
+    );
+    expect(api.requested).toEqual([]);
+
+    api.layers$ = null;
+    element.querySelector<HTMLButtonElement>('.error button')!.click();
+    await fixture.whenStable();
+
+    expect(element.querySelector('.error')).toBeNull();
+    expect(markers(fixture).length).toBe(2);
   });
 
   it('shows the status badge', async () => {

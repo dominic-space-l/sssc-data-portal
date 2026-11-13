@@ -1,9 +1,21 @@
 <div #map class="map"></div>
 <map-filter-panel class="filters" />
-<div class="messages" role="status">
-  @for (message of emptyMessages(); track message) {
-    <p class="empty">{{ message }}</p>
-  }
+<div class="messages">
+  <div role="alert">
+    @if (errors().length > 0) {
+      <div class="error">
+        @for (error of errors(); track error.id) {
+          <p>{{ error.text }}</p>
+        }
+        <button type="button" (click)="retry()">Retry</button>
+      </div>
+    }
+  </div>
+  <div role="status">
+    @for (message of emptyMessages(); track message) {
+      <p class="empty">{{ message }}</p>
+    }
+  </div>
 </div>
 <map-legend class="legend" />
 <map-status-badge class="status" />

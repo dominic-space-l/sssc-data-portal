@@ -3,6 +3,71 @@
 Versioning follows `xx.yy.zz` (see [documentation/CLAUDECODE/CLAUDE.md](../CLAUDECODE/CLAUDE.md)):
 `xx` = major feature, `yy` = steps/commits toward a major feature, `zz` = small updates and revisions.
 
+## 1.0.0 — 2026-11-13
+
+Map commit 18: documentation, and the **1.0 release** of the public map. Stations at masked locations, with popups, four filters (project, organization, station type, observation type), role colors and a legend, error and empty states, caching, and the database's privacy guarantees.
+- **`documentation/map/api.md`:** the API contract as built: routes and caching, the manifest (filters, `implies`, `hint`, `style_by`), features, detail, every error code, and the masking guarantees with how to check them.
+- **`documentation/map/adding_a_layer.md`:** how to change a layer's fields, filters, and colors, and how to add a layer end to end: the masking database function, the anon allowlist and pgTAP tests, the backend module, the registry, tests, optional styling, and checks against a real database.
+- **`map/README.md`:** every section filled in, with Overview, Architecture, Troubleshooting (each error message and its fix), Testing (unit, integration, smoke script, coordinate check), and Development. The Quickstart now includes the local database and `.env` setup.
+- **`documentation/CLAUDECODE/map_context.md`:** context for coding agents: the rules that must not be broken (masking, anon key only, no contact data, fail closed), the layout, conventions, and gotchas.
+- **`documentation/README.md`:** its directory guide points to the new map docs.
+- **`pyproject.toml`** is at `1.0.0`.
+- **Verification before 1.0:** the unit tests (161 backend, 89 frontend), lint, and build pass. The integration tests (7/7) and the coordinate check (10/10, offsets 271–348 m) pass against the local stack. Running them against the hosted project is left to the maintainer, since it needs the hosted service-role key.
+
+**Files changed**
+- `documentation/map/api.md`
+- `documentation/map/adding_a_layer.md`
+- `documentation/CLAUDECODE/map_context.md`
+- `documentation/README.md`
+- `map/README.md`
+- `map/backend/pyproject.toml`
+- `map/backend/uv.lock`
+- `documentation/map/map_app_plan.md`
+- `documentation/map/CHANGELOG.md`
+
+## 0.21.0 — 2026-11-13
+
+Map commit 17: hardening.
+- **Caching:** successful layer responses (manifest, features, detail) send `Cache-Control: public, max-age=CACHE_MAX_AGE` (default 300). Health and every error send `no-store`, so a temporary 503 is never cached.
+- **Request logging:** one line per request: method, path with query, status, and duration.
+- **Integration tests:** 7 tests against a real Supabase project, run with `SUPABASE_URL=... SUPABASE_KEY=<anon> uv run pytest -m integration`. They're deselected by default, read only the environment, and assume nothing about the data. They passed against the local stack.
+- **Smoke script:** `--check-coordinates` prompts for the service-role key, which is never an argument or stored, and checks that no point the live features route serves is at its true location, and that each is 250–500 m from it (235–515 m with rounding). Locally: offsets 271–348 m.
+- **Frontend error state:** when the backend is down, the manifest or a layer fails, or masking is unavailable (503), a message over the map says what failed and why, with a Retry button. A failed reload clears that layer's old markers.
+- **Tests:** 161 backend unit tests (from 150), plus 7 integration tests. 89 frontend (from 83): the error messages, Retry for a layer and for the manifest, clearing stale markers, and `MapState.reload`.
+- **pytest:** ignores the two deprecation warnings supabase-py 2.33 triggers in postgrest-py for every client (`timeout`, `verify`). They can't be avoided from our side.
+- **Checked live** on the dev server: each route's `Cache-Control`, including a `no-store` 503 with the Vault secret renamed, and the request log.
+
+**Files changed**
+- `map/backend/src/backend/http_hooks.py`
+- `map/backend/src/backend/__init__.py`
+- `map/backend/scripts/smoke_supabase.py`
+- `map/backend/tests/test_http_hooks.py`
+- `map/backend/tests/test_integration.py`
+- `map/backend/pyproject.toml`
+- `map/backend/uv.lock`
+- `map/backend/README.md`
+- `map/frontend/src/app/core/map-state.ts`
+- `map/frontend/src/app/core/map-state.spec.ts`
+- `map/frontend/src/app/map/map.ts`
+- `map/frontend/src/app/map/map.html`
+- `map/frontend/src/app/map/map.scss`
+- `map/frontend/src/app/map/map.spec.ts`
+- `map/frontend/src/app/map/error-message.ts`
+- `map/frontend/src/app/map/error-message.spec.ts`
+- `map/frontend/README.md`
+- `documentation/map/map_app_plan.md`
+- `documentation/map/CHANGELOG.md`
+
+## 0.20.1 — 2026-11-13
+
+Plan update before the wrap-up.
+- **After 1.0:** added "style parity with the marine debris map". It compares the palette, fonts, marker look, filter panel and legend styling, and control placement, then aligns them, keeping the role colors colorblind-safe. It lists the styling files it would touch. A link to the marine debris map is to be added when the item is picked up.
+- **Verification:** recorded the hand check in a browser of steps 13–16 (filters, role pies, legend, and project → organization), which the automated tests couldn't cover visually.
+
+**Files changed**
+- `documentation/map/map_app_plan.md`
+- `documentation/map/CHANGELOG.md`
+
 ## 0.20.0 — 2026-11-13
 
 Map commit 16: a project selects its managing organization. **Feature:** picking a project shows its stations, colored by the roles of the organization that runs it.
