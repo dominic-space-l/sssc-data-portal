@@ -250,7 +250,7 @@ alter default privileges in schema public revoke all on sequences from anon;
 ### S4. Masking secret and `mask_point` — map `0.7.0`
 
 > **Done (0.7.0).** Migration `20261112062156_s4_mask_point.sql`, tests in `supabase/tests/04_mask_point.test.sql`. The function is the one below, unchanged. What the implementation found:
-> - **The hosted secret is still a manual step.** Run the `vault.create_secret` call below before S5's `map_stations` is used. Until then, `mask_point` raises instead of returning a point. The step is also listed under "Hosted project: one-time manual steps" in `supabase/README.md`.
+> - **The hosted secret is a manual step, done on 2026-11-12.** It was created by hand with the `vault.create_secret` call below, not in a migration. Without it, `mask_point` raises instead of returning a point. To redo it (for example on a rebuilt project), follow "Hosted project: one-time manual steps" in `supabase/README.md`.
 > - **Local secret in the seed.** The plan had each test insert a secret inside its transaction. Instead, `supabase/seed.sql` creates a throwaway local `map_location_mask_secret`, so masking works in local development and in S5's tests without extra setup. The tests delete or replace it inside their own transactions when they need to. `supabase db push` never sends the seed.
 > - pgcrypto, Vault (0.3.1), and PostGIS are already installed by Supabase in `extensions` and `vault`, so the `extensions.` prefixes work as written.
 > - `map_private` is now linted in CI and in `npm run db:lint`.
@@ -329,6 +329,12 @@ comment on function map_private.mask_point(bigint, numeric, numeric) is
 
 ### S5. `map_stations` function — map `0.8.0`
 
+> **Done (0.8.0).** Migration `20261113022518_s5_map_stations.sql`, tests in `supabase/tests/05_map_stations.test.sql`. The function is the one below. The only change is that the revoke also names `anon`, so anon's execute comes only from the explicit grant and not from `postgres`'s default privileges. What the implementation found:
+> - Lint and the security advisors report nothing for a `security definer` function granted to anon, so CI doesn't flag it.
+> - **Fail closed, with one gap:** with the secret missing, any call that would return a station raises `P0001`. A call whose filters match no station may return `[]` instead, depending on the plan Postgres picks. That leaks nothing, but the backend can't assume an empty result means masking is configured.
+> - Over the local API, `rpc/map_stations` as anon returns the masked rows and `roles` as a JSON array (`[]` for none, `null` with no organization). A direct request for `Stations` still returns 401.
+> - `code` can be `null` (seeded station 4). The backend should treat a missing code as absent, not as the string `"null"`.
+
 One call returns the stations for the map with the filters applied and coordinates masked. It implements the [org/project interaction table](map_app_plan.md#filter-and-color-behavior):
 
 - `roles` is `null` when no organization is given, and otherwise the sorted role ids that organization holds at the station (`{}` for none).
@@ -371,7 +377,7 @@ as $$
 $$;
 
 revoke all on function public.map_stations(bigint, bigint, bigint[], bigint[], bigint)
-  from public, authenticated;
+  from public, anon, authenticated;
 grant execute on function public.map_stations(bigint, bigint, bigint[], bigint[], bigint) to anon;
 comment on function public.map_stations(bigint, bigint, bigint[], bigint[], bigint) is
   'Public map stations with masked coordinates. Organization filters only when no project is given.';
@@ -423,7 +429,7 @@ as $$
       from public."StationRoles" sr));
 $$;
 
-revoke all on function public.map_filter_options() from public, authenticated;
+revoke all on function public.map_filter_options() from public, anon, authenticated;
 grant execute on function public.map_filter_options() to anon;
 comment on function public.map_filter_options() is
   'Dropdown options for the public map: projects (with station counts), organizations with roles, types, roles.';

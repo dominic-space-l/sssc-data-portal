@@ -33,7 +33,7 @@ One-time setup to work against the hosted project:
 
 These hold secrets, so they're done by hand in the dashboard's SQL editor and never go in a migration:
 
-- **Location-masking secret** (before S5's `map_stations` is used): `select vault.create_secret('<value>', 'map_location_mask_secret');`, with the value from `openssl rand -base64 48`. Don't keep a copy anywhere else. Changing it later moves every marker on the public map. Until it exists, `map_private.mask_point` raises `location masking is not configured`. Check that it exists with `select name, created_at from vault.secrets;`. Locally, `seed.sql` creates a throwaway one.
+- **Location-masking secret** (done on the hosted project on 2026-11-12; redo only on a new or rebuilt project): `select vault.create_secret('<value>', 'map_location_mask_secret');`, with the value from `openssl rand -base64 48`. Don't keep a copy anywhere else. Changing it later moves every marker on the public map. Until it exists, `map_private.mask_point` raises `location masking is not configured`, and so does every `map_stations` call that would return a station. Check that it exists with `select name, created_at from vault.secrets;`. Locally, `seed.sql` creates a throwaway one.
 - **Exposed schemas:** **Settings → API → Exposed schemas** must not include `map_private`.
 
 `supabase/.temp/` (link state) and `.env*` files are git-ignored. Never commit database passwords or access tokens.
@@ -56,7 +56,13 @@ Never edit a migration that has already been merged or pushed. Write a new one i
 
 ## Access rules for the anon role
 
-The anon key is public, so the anon role gets no access to tables (since map `0.6.0`, step S3 of the [Supabase plan](../documentation/map/supabase_plan.md)). Every table in `public` has RLS on, and anon has no table or sequence privileges. It reaches data only through functions on an allowlist. `tests/03_anon_rls.test.sql` checks all of this from the catalog, so it fails if:
+The anon key is public, so the anon role gets no access to tables (since map `0.6.0`, step S3 of the [Supabase plan](../documentation/map/supabase_plan.md)). Every table in `public` has RLS on, and anon has no table or sequence privileges. It reaches data only through functions on an allowlist:
+
+| Function | Since | Returns |
+| --- | --- | --- |
+| `map_stations(p_project, p_organization, p_station_types, p_observation_types, p_station)` | `0.8.0` (S5) | The map's stations: id, name, code, active flag, a masked point (250–500 m from the true one), and the organization's role ids at each station. `null` means "no filter" for every parameter. The organization filters only when no project is given. |
+
+Each one is `security definer` with an empty `search_path`, and returns a fixed list of columns, so adding a field to the public map means a reviewed migration. Its execute privilege is revoked from `PUBLIC` and `authenticated` and granted to `anon` alone. `tests/03_anon_rls.test.sql` checks all of this from the catalog, so it fails if:
 
 - a new table doesn't have RLS on: add `alter table ... enable row level security` to its migration
 - a policy applies to `anon` or `PUBLIC` (a policy with no `to` clause applies to `PUBLIC`): name a role, such as `to authenticated`

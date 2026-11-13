@@ -3,6 +3,25 @@
 Versioning follows `xx.yy.zz` (see [documentation/CLAUDECODE/CLAUDE.md](../CLAUDECODE/CLAUDE.md)):
 `xx` = major feature, `yy` = steps/commits toward a major feature, `zz` = small updates and revisions.
 
+## 0.8.0 — 2026-11-12
+
+Supabase step S5: `public.map_stations`, the public map's only way to read stations.
+- **Function:** one call returns the map's stations with the filters applied: project, organization, station types, observation types, and one station for the detail route. `null` means "no filter", and an empty array matches nothing. It follows the org/project interaction table: the organization filters only when no project is given, and `roles` holds the organization's sorted role ids at each station (`{}` for none, `null` with no organization).
+- **Privacy:** every point comes from `map_private.mask_point`, so true coordinates never leave Postgres. Only seven columns come out: `station_id`, `name`, `code`, `is_active`, `lon`, `lat`, and `roles`. Notes, elevation, the site, and true coordinates are never returned. With the Vault secret missing, any call that would return a station raises `location masking is not configured`.
+- **Access:** `security definer` with an empty `search_path`. Execute is revoked from `PUBLIC`, `anon`, and `authenticated`, then granted to `anon` alone. It's the first function on the S3 test's anon allowlist.
+- **Tests:** new pgTAP tests check the definition, the result columns, and the privileges. As anon, they check each row of the interaction table, the type filters (`null`, one, several, empty), `p_station`, that no point equals or sits near its true location, and that each point is exactly `mask_point`'s output whatever the filters. They also check that `authenticated` can't call it and that a missing secret raises.
+- **Docs:** marked S5 done in the plan. The plan's S6 revoke now names `anon` as well, the same as S5. `supabase/README.md` lists the anon-callable functions.
+- **Hosted secret:** the hosted `map_location_mask_secret` was created by hand on 2026-11-12. The plan's S4 note, `map_app_plan.md`, and the README's one-time steps now say it's done.
+
+**Files changed**
+- `supabase/migrations/20261113022518_s5_map_stations.sql`
+- `supabase/tests/05_map_stations.test.sql`
+- `supabase/tests/03_anon_rls.test.sql`
+- `supabase/README.md`
+- `documentation/map/supabase_plan.md`
+- `documentation/map/map_app_plan.md`
+- `documentation/map/CHANGELOG.md`
+
 ## 0.7.0 — 2026-11-11
 
 Supabase step S4: the masking secret and `map_private.mask_point`.
