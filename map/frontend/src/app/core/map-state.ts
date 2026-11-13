@@ -26,6 +26,8 @@ export interface LayerLoad {
   readonly error?: ApiError;
   /** How many features were drawn, when `status` is `'ready'`. */
   readonly count?: number;
+  /** How many of them are muted (drawn greyed out), when `status` is `'ready'`. */
+  readonly mutedCount?: number;
 }
 
 const NO_FILTERS: FilterValues = {};

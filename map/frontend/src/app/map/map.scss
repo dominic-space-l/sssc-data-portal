@@ -34,6 +34,13 @@
   font: 14px/1.4 sans-serif;
 }
 
+.legend {
+  position: absolute;
+  bottom: 24px;
+  left: 10px;
+  z-index: 1000;
+}
+
 .status {
   position: absolute;
   right: 10px;

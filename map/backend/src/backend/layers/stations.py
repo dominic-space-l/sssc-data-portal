@@ -11,9 +11,13 @@ Properties of each feature:
     code     StationCode, or "—" when it's missing
     active   "Yes", "No", or "Unknown" (IsActive is nullable)
     muted    true when the station is inactive, so the map greys it out
+    roles    only when an organization is chosen: the sorted ids of the roles it holds
+             at the station ([] for none). The layer's style_by colors markers by it.
 
 Filters (query parameter -> map_stations parameter):
     project            select      -> p_project (projects with no stations are hinted)
+    organization       select      -> p_organization (filters only without a project;
+                                      always sets the roles, see map_stations)
     station_type       multiselect -> p_station_types
     observation_type   multiselect -> p_observation_types
 
@@ -39,6 +43,7 @@ from backend.layers.base import (
     LayerOptions,
     PopupField,
     StyleBy,
+    StyleValue,
     point_feature,
 )
 
@@ -52,6 +57,7 @@ _ACTIVE_LABELS = {True: "Yes", False: "No", None: "Unknown"}
 # The map_stations parameter each filter is passed as.
 _RPC_PARAMS = {
     "project": "p_project",
+    "organization": "p_organization",
     "station_type": "p_station_types",
     "observation_type": "p_observation_types",
 }
@@ -99,6 +105,7 @@ def _project_options(projects: Sequence[Mapping[str, Any]]) -> list[FilterOption
 # How each filter's options are built from the map_filter_options result.
 _OPTION_BUILDERS: dict[str, Callable[[Mapping[str, Any]], list[FilterOption]]] = {
     "project": lambda options: _project_options(options["projects"]),
+    "organization": lambda options: _id_name_options(options["organizations"]),
     "station_type": lambda options: _id_name_options(options["station_types"]),
     "observation_type": lambda options: _id_name_options(options["observation_types"]),
 }
@@ -124,10 +131,16 @@ class StationsLayer:
     )
     filters = (
         FilterDef("project", "Project", FilterType.SELECT),
+        FilterDef("organization", "Organization", FilterType.SELECT),
         FilterDef("station_type", "Station type", FilterType.MULTISELECT),
         FilterDef("observation_type", "Observes", FilterType.MULTISELECT),
     )
-    style_by: StyleBy | None = None
+    style_by = StyleBy(
+        property="roles",
+        label="Role",
+        active_when="organization",
+        fallback_label="No role with this organization",
+    )
 
     def options(self, db: Database) -> LayerOptions:
         """Reads every filter's options with one ``map_filter_options`` call.
@@ -136,7 +149,8 @@ class StationsLayer:
             db: The database.
 
         Returns:
-            Options for each filter, in the order the database sorts them (by name).
+            Options for each filter, in the order the database sorts them (by name),
+            and the roles as style_by values, in RoleID order (the color order).
 
         Raises:
             UpstreamError: Supabase failed.
@@ -145,7 +159,10 @@ class StationsLayer:
             StationsLayer().options(db)
         """
         options = db.rpc("map_filter_options")
-        return LayerOptions(filters={f.key: _OPTION_BUILDERS[f.key](options) for f in self.filters})
+        return LayerOptions(
+            filters={f.key: _OPTION_BUILDERS[f.key](options) for f in self.filters},
+            style_values=[StyleValue(role["id"], role["name"]) for role in options["roles"]],
+        )
 
     def features(self, db: Database, filters: Mapping[str, FilterValue]) -> list[dict]:
         """Returns the matching stations as point features at their masked locations.
@@ -231,17 +248,21 @@ def _properties(row: Mapping[str, Any]) -> dict[str, Any]:
         row: One row from map_stations.
 
     Returns:
-        ``name``, ``code``, ``active``, and ``muted``.
+        ``name``, ``code``, ``active``, and ``muted``, plus ``roles`` when the row has
+        them (an organization was chosen).
 
     Usage:
         _properties({"name": "Harbor", "code": None, "is_active": False, ...})
     """
-    return {
+    properties = {
         "name": row["name"],
         "code": row["code"] or MISSING_CODE,
         "active": _ACTIVE_LABELS[row["is_active"]],
         "muted": row["is_active"] is False,
     }
+    if row.get("roles") is not None:
+        properties["roles"] = list(row["roles"])
+    return properties
 
 
 def _to_feature(row: Mapping[str, Any]) -> dict[str, Any]:

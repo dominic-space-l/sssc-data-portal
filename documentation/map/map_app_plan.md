@@ -418,6 +418,14 @@ Each step adds its own pgTAP tests.
 - Frontend: `layers/markers.ts` builds an SVG marker from the `style_by` palette in `registry.ts`, using Okabe–Ito colors in `RoleID` order: a solid circle for one role, and a pie with one equal slice per role for several. Markers with no roles use the fallback gray. Muted markers keep their slices but are greyed out. `legend/` shows the role colors while `style_by.active_when` has a value, plus the `muted_label` entry whenever any muted marker is on the map.
 - **Feature:** pick an organization to see its stations, colored by its role at each one.
 
+> **Done (0.19.0).** What the implementation decided:
+> - **Backend:** `organization` is the second filter, passed as `p_organization`. `style_by` is `roles` / "Role", active when `organization` is set, with fallback "No role with this organization". Its values are the roles from `map_filter_options`, in RoleID order. A feature carries `properties.roles` only when the row has roles (an organization was chosen), so the property appears exactly when the coloring applies.
+> - **Coloring** (`layers/style-by.ts`, generic): active while the `active_when` filter has a value. Each value takes the next Okabe–Ito color (`registry.ts`, cycling past 8), unless `STYLE_BY_OVERRIDES` pins one by label (empty for now). A feature's colors follow its property's order. Unknown values are skipped, and none gives `FALLBACK_COLOR` (`#9E9E9E`).
+> - **Markers:** one color is a solid circle. Several make a pie of equal SVG slices, starting at 12 o'clock and going clockwise, with thin white lines between slices and an outline ring. Muted pies keep their colors at 50% opacity with the gray outline.
+> - **Not color alone:** while coloring is active, a marker's title (its tooltip and accessible name) lists its value labels, e.g. "Test Station 1 (Owner, Maintainer)", or the fallback label.
+> - **Legend** (`legend/`, bottom left): "Role" with each role's swatch and the fallback while an organization is chosen, plus the layer's `muted_label` whenever a muted marker is drawn. `LayerLoad` gained `mutedCount` for this. The muted swatch takes its outline and opacity from the marker constants, so the two can't drift.
+> - **Checked live** on the local stack: org 1 → 1 `[1, 3]`, 2 `[2]`; org 3 → none; project 1 + org 2 → 1 `[2]`, 2 `[]`, matching the interaction table.
+
 **16. Project selects its managing organization — `0.20.0`**
 - Backend: each project option `implies` its `organization_id`. `map_stations()` already applies the rule that a project turns the organization into colors only. A test checks that both parameters are passed together.
 - Frontend: `MapState.setFilter` applies `implies` and records which values it set. Clearing the project clears values it implied, unless the user has since changed them. The organization dropdown stays editable.

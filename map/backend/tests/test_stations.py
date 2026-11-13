@@ -205,6 +205,7 @@ def test_database_failures_are_not_coordinates(error, status, code):
         ("?station_type=&observation_type=", {}),
         ("?project=3", {"p_project": 3}),
         ("?project=1&station_type=2", {"p_project": 1, "p_station_types": [2]}),
+        ("?organization=2", {"p_organization": 2}),
     ],
     ids=[
         "none",
@@ -215,6 +216,7 @@ def test_database_failures_are_not_coordinates(error, status, code):
         "blank",
         "project",
         "project+type",
+        "organization",
     ],
 )
 def test_filters_become_map_stations_params(query, params):
@@ -311,6 +313,16 @@ def test_manifest_filters_come_from_map_filter_options():
             ],
         },
         {
+            "key": "organization",
+            "label": "Organization",
+            "type": "select",
+            "options": [
+                {"value": 1, "label": "Test Org A"},
+                {"value": 2, "label": "Test Org B"},
+                {"value": 3, "label": "Test Org C"},
+            ],
+        },
+        {
             "key": "station_type",
             "label": "Station type",
             "type": "multiselect",
@@ -330,6 +342,52 @@ def test_manifest_filters_come_from_map_filter_options():
             ],
         },
     ]
+
+
+def test_manifest_style_by_colors_by_role_while_an_organization_is_chosen():
+    """style_by colors markers by roles, with every role in RoleID order.
+
+    Usage:
+        uv run pytest -k colors_by_role
+    """
+    entry, _ = _manifest_entry()
+    assert entry["style_by"] == {
+        "property": "roles",
+        "label": "Role",
+        "active_when": "organization",
+        "values": [
+            {"value": 1, "label": "Owner"},
+            {"value": 2, "label": "Operator"},
+            {"value": 3, "label": "Maintainer"},
+        ],
+        "fallback_label": "No role with this organization",
+    }
+
+
+ORG_ROWS = [
+    {**ROWS[0], "roles": [1, 3]},
+    {**ROWS[1], "roles": [2]},
+    {**ROWS[2], "roles": []},
+]
+
+
+def test_roles_are_a_property_only_when_an_organization_is_chosen():
+    """With an organization, each feature carries its role ids ([] for none).
+
+    Usage:
+        uv run pytest -k only_when_an_organization
+    """
+    db = FakeDatabase({"map_stations": ORG_ROWS})
+    response = _client(db).get("/api/layers/stations/features?organization=1")
+    assert db.calls == [("map_stations", {"p_organization": 1})]
+    assert [f["properties"]["roles"] for f in response.get_json()["features"]] == [
+        [1, 3],
+        [2],
+        [],
+    ]
+
+    plain = STATIONS.features(FakeDatabase({"map_stations": ROWS}), {})
+    assert all("roles" not in f["properties"] for f in plain)
 
 
 def test_project_select_takes_one_project():

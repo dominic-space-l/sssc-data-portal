@@ -36,7 +36,8 @@ npm test -w map-frontend         # Vitest unit tests
 | `src/app/` | Root component (`app.ts`), routes (`app.routes.ts`), providers (`app.config.ts`) |
 | `src/app/map/` | `MapView`: the Leaflet map. Draws each visible layer from the manifest, redraws it when its filters change, and shows an empty-state message (`empty-message.ts`). Zoom is capped at 14. |
 | `src/app/core/` | `models.ts`: types for the API contract. `map-api.ts`: `MapApi` (health, layers, features, detail), `filterParams`, and `describeApiError`. `map-state.ts`: `MapState`, the shared signals (manifest, filter values, load status). |
-| `src/app/layers/` | How layers look: `registry.ts` (marker style per layer id, with a default), `markers.ts` (SVG marker factory, muted styling), `popup.ts` (popup built from the manifest's `popup_fields`) |
+| `src/app/layers/` | How layers look: `registry.ts` (marker style per layer id, with a default, and the Okabe–Ito `style_by` palette), `style-by.ts` (when `style_by` coloring applies and each feature's colors), `markers.ts` (SVG marker factory: solid, pie, and muted), `popup.ts` (popup built from the manifest's `popup_fields`) |
+| `src/app/legend/` | `Legend`: the `style_by` colors while active, and the muted label when muted markers are drawn |
 | `src/app/filter-panel/` | `FilterPanel`: one control per manifest filter (dropdown with "All", checkbox list, or checkbox), writing values to `MapState` |
 | `src/app/status-badge/` | `StatusBadge`: the backend health badge |
 | `proxy.conf.json` | Dev proxy: `/api/*` → `http://127.0.0.1:5001` |

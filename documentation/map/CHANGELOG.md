@@ -3,6 +3,43 @@
 Versioning follows `xx.yy.zz` (see [documentation/CLAUDECODE/CLAUDE.md](../CLAUDECODE/CLAUDE.md)):
 `xx` = major feature, `yy` = steps/commits toward a major feature, `zz` = small updates and revisions.
 
+## 0.19.0 — 2026-11-13
+
+Map commit 15: organization filter with role colors. **Feature:** pick an organization to see its stations, colored by its role at each one.
+- **Backend:** an `organization` select filter (passed as `p_organization`) and a `style_by` on `roles` ("Role"), active while an organization is chosen. Its values are the roles from `map_filter_options`, in RoleID order. With an organization, each feature carries `properties.roles` (`[]` for none).
+- **Frontend:**
+  - Markers take Okabe–Ito colors in RoleID order while an organization is chosen: a solid circle for one role, a pie with one equal slice per role for several, and gray for none. Muted markers keep their slices but are greyed out.
+  - A marker's title also names its roles, so the coloring isn't conveyed by color alone.
+  - A new `legend/` shows the role colors and "No role with this organization" while an organization is chosen, plus "Inactive" whenever an inactive station is drawn.
+  - The coloring rules are in a new `layers/style-by.ts`, and the palette (with optional per-role overrides) is in `registry.ts`.
+- **Tests:** 149 backend (from 146): the organization parameter, `style_by` in the manifest, and `roles` only with an organization. 74 frontend (from 56): coloring rules, pie markers, the legend, and `MapView` coloring with role titles.
+- **Checked live** against the local stack: organization alone and project plus organization returned the stations and roles from the interaction table.
+
+**Files changed**
+- `map/backend/src/backend/layers/stations.py`
+- `map/backend/tests/test_stations.py`
+- `map/backend/pyproject.toml`
+- `map/backend/uv.lock`
+- `map/backend/README.md`
+- `map/frontend/src/app/core/map-state.ts`
+- `map/frontend/src/app/layers/registry.ts`
+- `map/frontend/src/app/layers/style-by.ts`
+- `map/frontend/src/app/layers/style-by.spec.ts`
+- `map/frontend/src/app/layers/markers.ts`
+- `map/frontend/src/app/layers/layers.spec.ts`
+- `map/frontend/src/app/legend/legend.ts`
+- `map/frontend/src/app/legend/legend.html`
+- `map/frontend/src/app/legend/legend.scss`
+- `map/frontend/src/app/legend/legend.spec.ts`
+- `map/frontend/src/app/map/map.ts`
+- `map/frontend/src/app/map/map.html`
+- `map/frontend/src/app/map/map.scss`
+- `map/frontend/src/app/map/map.spec.ts`
+- `map/frontend/README.md`
+- `map/README.md`
+- `documentation/map/map_app_plan.md`
+- `documentation/map/CHANGELOG.md`
+
 ## 0.18.0 — 2026-11-13
 
 Map commit 14: project filter. **Feature:** pick a project to see only its stations, and see at a glance which projects have none.
