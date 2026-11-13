@@ -29,6 +29,31 @@ ROWS = [
      "lon": -135.3, "lat": 57.06, "roles": None},
 ]  # fmt: skip
 
+# What map_filter_options returned from the local Supabase stack (seed data).
+OPTIONS = {
+    "projects": [
+        {"id": 1, "name": "Project Alpha", "organization_id": 1, "station_count": 2},
+        {"id": 2, "name": "Project Beta", "organization_id": 2, "station_count": 1},
+        {"id": 3, "name": "Project Empty", "organization_id": 3, "station_count": 0},
+    ],
+    "organizations": [
+        {"id": 1, "name": "Test Org A"},
+        {"id": 2, "name": "Test Org B"},
+        {"id": 3, "name": "Test Org C"},
+    ],
+    "station_types": [{"id": 2, "name": "Tide gauge"}, {"id": 1, "name": "Weather station"}],
+    "observation_types": [
+        {"id": 1, "name": "Air temperature"},
+        {"id": 3, "name": "Precipitation"},
+        {"id": 2, "name": "Water level"},
+    ],
+    "roles": [
+        {"id": 1, "name": "Owner"},
+        {"id": 2, "name": "Operator"},
+        {"id": 3, "name": "Maintainer"},
+    ],
+}
+
 
 def _client(db):
     """A test client serving the real layer registry against a fake database.
@@ -161,14 +186,67 @@ def test_database_failures_are_not_coordinates(error, status, code):
     assert "features" not in response.get_json()
 
 
-def test_stations_take_no_filters_yet():
-    """Until steps 13-16 add filters, any query parameter is a 400.
+# ---------------------------------------------------------------------------------------
+# Filters
+# ---------------------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("query", "params"),
+    [
+        ("", {}),
+        ("?station_type=1", {"p_station_types": [1]}),
+        ("?station_type=2,1", {"p_station_types": [2, 1]}),
+        ("?observation_type=3&observation_type=1", {"p_observation_types": [3, 1]}),
+        (
+            "?station_type=1&observation_type=2",
+            {"p_station_types": [1], "p_observation_types": [2]},
+        ),
+        ("?station_type=&observation_type=", {}),
+        ("?project=3", {"p_project": 3}),
+        ("?project=1&station_type=2", {"p_project": 1, "p_station_types": [2]}),
+        ("?organization=2", {"p_organization": 2}),
+    ],
+    ids=[
+        "none",
+        "one-type",
+        "two-types",
+        "observations",
+        "both",
+        "blank",
+        "project",
+        "project+type",
+        "organization",
+    ],
+)
+def test_filters_become_map_stations_params(query, params):
+    """Each set filter is passed as its map_stations parameter. Unset ones aren't sent.
+
+    Args:
+        query: The features query string.
+        params: The expected map_stations params.
 
     Usage:
-        uv run pytest -k no_filters_yet
+        uv run pytest -k map_stations_params
     """
     db = FakeDatabase({"map_stations": ROWS})
-    response = _client(db).get("/api/layers/stations/features?project=1")
+    response = _client(db).get(f"/api/layers/stations/features{query}")
+    assert response.status_code == 200
+    assert db.calls == [("map_stations", params)]
+
+
+@pytest.mark.parametrize("query", ["?station_type=abc", "?colour=1"], ids=["bad-id", "unknown"])
+def test_invalid_filters_are_a_400_before_any_database_call(query):
+    """A malformed or unknown filter is refused without calling map_stations.
+
+    Args:
+        query: An invalid query string.
+
+    Usage:
+        uv run pytest -k before_any_database_call
+    """
+    db = FakeDatabase({"map_stations": ROWS})
+    response = _client(db).get(f"/api/layers/stations/features{query}")
     assert response.status_code == 400
     assert db.calls == []
 
@@ -178,32 +256,169 @@ def test_stations_take_no_filters_yet():
 # ---------------------------------------------------------------------------------------
 
 
-def test_manifest_entry():
-    """The manifest entry matches the API contract, and needs no database call yet.
+def _manifest_entry():
+    """Fetches the stations manifest entry from the API with canned options.
+
+    Returns:
+        The entry, and the FakeDatabase's calls.
 
     Usage:
-        uv run pytest -k manifest_entry
+        entry, calls = _manifest_entry()
     """
-    db = FakeDatabase()
+    db = FakeDatabase({"map_filter_options": OPTIONS})
     response = _client(db).get("/api/layers")
     assert response.status_code == 200
-    assert response.get_json() == {
-        "layers": [
-            {
-                "id": "stations",
-                "title": "Stations",
-                "default_visible": True,
-                "location_note": "Approximate location",
-                "muted_label": "Inactive",
-                "popup_fields": [
-                    {"key": "name", "label": "Station"},
-                    {"key": "code", "label": "Code"},
-                    {"key": "active", "label": "Active"},
-                ],
-                "filters": [],
-            }
-        ]
+    (entry,) = response.get_json()["layers"]
+    return entry, db.calls
+
+
+def test_manifest_entry_describes_the_layer():
+    """The static parts of the manifest entry match the API contract.
+
+    Usage:
+        uv run pytest -k describes_the_layer
+    """
+    entry, _ = _manifest_entry()
+    assert {key: value for key, value in entry.items() if key not in ("filters", "style_by")} == {
+        "id": "stations",
+        "title": "Stations",
+        "default_visible": True,
+        "location_note": "Approximate location",
+        "muted_label": "Inactive",
+        "popup_fields": [
+            {"key": "name", "label": "Station"},
+            {"key": "code", "label": "Code"},
+            {"key": "active", "label": "Active"},
+        ],
     }
+
+
+def test_manifest_filters_come_from_map_filter_options():
+    """Every filter's options come from one map_filter_options call, in its order.
+
+    Usage:
+        uv run pytest -k come_from_map_filter_options
+    """
+    entry, calls = _manifest_entry()
+    assert calls == [("map_filter_options", {})]
+    assert entry["filters"] == [
+        {
+            "key": "project",
+            "label": "Project",
+            "type": "select",
+            "options": [
+                {"value": 1, "label": "Project Alpha", "implies": {"organization": 1}},
+                {"value": 2, "label": "Project Beta", "implies": {"organization": 2}},
+                {
+                    "value": 3,
+                    "label": "Project Empty",
+                    "implies": {"organization": 3},
+                    "hint": "No stations",
+                },
+            ],
+        },
+        {
+            "key": "organization",
+            "label": "Organization",
+            "type": "select",
+            "options": [
+                {"value": 1, "label": "Test Org A"},
+                {"value": 2, "label": "Test Org B"},
+                {"value": 3, "label": "Test Org C"},
+            ],
+        },
+        {
+            "key": "station_type",
+            "label": "Station type",
+            "type": "multiselect",
+            "options": [
+                {"value": 2, "label": "Tide gauge"},
+                {"value": 1, "label": "Weather station"},
+            ],
+        },
+        {
+            "key": "observation_type",
+            "label": "Observes",
+            "type": "multiselect",
+            "options": [
+                {"value": 1, "label": "Air temperature"},
+                {"value": 3, "label": "Precipitation"},
+                {"value": 2, "label": "Water level"},
+            ],
+        },
+    ]
+
+
+def test_manifest_style_by_colors_by_role_while_an_organization_is_chosen():
+    """style_by colors markers by roles, with every role in RoleID order.
+
+    Usage:
+        uv run pytest -k colors_by_role
+    """
+    entry, _ = _manifest_entry()
+    assert entry["style_by"] == {
+        "property": "roles",
+        "label": "Role",
+        "active_when": "organization",
+        "values": [
+            {"value": 1, "label": "Owner"},
+            {"value": 2, "label": "Operator"},
+            {"value": 3, "label": "Maintainer"},
+        ],
+        "fallback_label": "No role with this organization",
+    }
+
+
+ORG_ROWS = [
+    {**ROWS[0], "roles": [1, 3]},
+    {**ROWS[1], "roles": [2]},
+    {**ROWS[2], "roles": []},
+]
+
+
+def test_roles_are_a_property_only_when_an_organization_is_chosen():
+    """With an organization, each feature carries its role ids ([] for none).
+
+    Usage:
+        uv run pytest -k only_when_an_organization
+    """
+    db = FakeDatabase({"map_stations": ORG_ROWS})
+    response = _client(db).get("/api/layers/stations/features?organization=1")
+    assert db.calls == [("map_stations", {"p_organization": 1})]
+    assert [f["properties"]["roles"] for f in response.get_json()["features"]] == [
+        [1, 3],
+        [2],
+        [],
+    ]
+
+    plain = STATIONS.features(FakeDatabase({"map_stations": ROWS}), {})
+    assert all("roles" not in f["properties"] for f in plain)
+
+
+def test_project_and_its_organization_are_passed_together():
+    """A project with its organization sends both parameters to map_stations.
+
+    map_stations then filters by the project and uses the organization for roles only.
+
+    Usage:
+        uv run pytest -k passed_together
+    """
+    db = FakeDatabase({"map_stations": ORG_ROWS[:2]})
+    response = _client(db).get("/api/layers/stations/features?project=1&organization=1")
+    assert response.status_code == 200
+    assert db.calls == [("map_stations", {"p_project": 1, "p_organization": 1})]
+    assert [f["properties"]["roles"] for f in response.get_json()["features"]] == [[1, 3], [2]]
+
+
+def test_project_select_takes_one_project():
+    """Project is a single-value filter: two projects is a 400.
+
+    Usage:
+        uv run pytest -k takes_one_project
+    """
+    db = FakeDatabase({"map_stations": ROWS})
+    response = _client(db).get("/api/layers/stations/features?project=1&project=2")
+    assert response.status_code == 400
     assert db.calls == []
 
 

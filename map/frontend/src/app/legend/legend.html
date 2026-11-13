@@ -1,0 +1,21 @@
+@if (sections().length > 0) {
+  <aside class="legend" aria-label="Legend">
+    @for (section of sections(); track section.layerId) {
+      <h2>{{ section.title }}</h2>
+      <ul>
+        @for (row of section.rows; track row.label) {
+          <li>
+            <span
+              class="swatch"
+              [style.background-color]="row.color"
+              [style.border-color]="row.muted ? mutedOutline : null"
+              [style.opacity]="row.muted ? mutedOpacity : null"
+              aria-hidden="true"
+            ></span>
+            {{ row.label }}
+          </li>
+        }
+      </ul>
+    }
+  </aside>
+}

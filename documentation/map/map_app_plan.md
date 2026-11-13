@@ -385,7 +385,7 @@ Each step adds its own pgTAP tests.
 > - **Popups are built from DOM nodes with `textContent`** (`layers/popup.ts`), never HTML strings. A station name with markup renders as text. Missing values show `—`.
 > - **`StatusBadge`** (`status-badge/`) is now its own component, with `role="status"`. The placeholder Sitka marker, Leaflet's default-icon setup, and `src/assets.d.ts` (PNG imports) are removed.
 > - **Errors** are recorded in `MapState` (`layerLoads[...].error`, `manifestError`) but not shown yet. Step 17 adds the visible error state.
-> - **Checked** with `npm run dev:map` against the local Supabase stack: the page, health, manifest, and 4 stations (station 3 muted) all served through the dev proxy. No headless browser was available, so the rendered map itself was checked only in jsdom tests.
+> - **Checked** with `npm run dev:map` against the local Supabase stack: the page, health, manifest, and 4 stations (station 3 muted) all served through the dev proxy. No headless browser was available for automated checks, but the rendered map was checked by hand in a browser against the local stack (2026-11-12): the seeded test stations showed up as expected.
 
 ### Filtering and coloring
 
@@ -395,20 +395,51 @@ Each step adds its own pgTAP tests.
 - `MapView` shows an empty state when the layer returns no features ("No stations match these filters").
 - **Feature:** filter stations by type and by what they observe.
 
+> **Done (0.17.0).** What the implementation decided:
+> - **Backend:** `stations.py` keeps one table mapping filter keys to `map_stations` parameters, and one options builder per filter. Each later step adds an entry to both. `options()` reads `map_filter_options` once per manifest, and its name order is kept. Unset filters are left out of the RPC (not sent as `null`), so the function's defaults apply.
+> - **`MapState.setFilter`** stores an empty list as `null`, and `clearFilters` resets a layer.
+> - **`FilterPanel`** (`filter-panel/`) is a collapsible `<details>` panel at the top right, with one section per visible layer that has filters. A select is a native dropdown with "All" (null), labelled by its filter. A multiselect is a `<fieldset>` of checkboxes, with values kept in option order. A boolean checkbox means true or no filter, never false. A "Clear filters" button shows while any filter is set. The selected dropdown entry is bound on its `<option>`, so it survives the options rendering after the select.
+> - **Empty state** (`map/empty-message.ts`): "No *stations* match these filters." when a filter is set, and "No *stations* to show." otherwise. It's built from the layer's title, so the code stays generic. It's shown in a `role="status"` region at the top center.
+> - **Checked live** on the local stack: the manifest lists both filters' options, and `station_type=2` → 2, 4; `observation_type=1,3` → 1, 3; `station_type=1&observation_type=2` → none.
+
 **14. Project filter — `0.18.0`**
 - Backend: a `project` select filter with every project as an option, sorted by name. Projects whose station count is 0 get `hint: "No stations"`. Passed as `p_project`.
 - Frontend: the filter panel shows an option's `hint` as a muted tag after its label. When the selected option has a hint and the layer comes back empty, the empty state names it ("No stations are associated with *Snow Survey*").
 - **Feature:** pick a project to see only its stations, and see at a glance which projects have none.
+
+> **Done (0.18.0).** What the implementation decided:
+> - **Backend:** `project` is the first filter. Its options are in `map_filter_options`' name order, and those with `station_count` 0 get `hint: "No stations"`. It's passed as `p_project`, and two values are a 400.
+> - **Hint display:** a native `<option>` can't hold a styled tag, so a dropdown shows "Project Empty — No stations". In a checkbox list, the hint is a muted pill after the label. The select stays native for keyboard and screen-reader support.
+> - **Empty state:** if the selected option of any select filter has a hint, the message names it ("No stations are associated with Project Empty."), even when other filters are also set, because the hint already explains the empty result.
+> - **Checked live** on the local stack: Alpha → 1, 2; Beta → 3; Empty → none, with the hint; Alpha + tide gauge → 2.
 
 **15. Organization filter with role colors — `0.19.0`**
 - Backend: an `organization` select filter, with options from `map_filter_options()` (organizations with at least one role or a project). Passed as `p_organization`, and the rows' `roles` become `properties.roles`. The layer declares `style_by` with the roles from `map_filter_options()` as its values.
 - Frontend: `layers/markers.ts` builds an SVG marker from the `style_by` palette in `registry.ts`, using Okabe–Ito colors in `RoleID` order: a solid circle for one role, and a pie with one equal slice per role for several. Markers with no roles use the fallback gray. Muted markers keep their slices but are greyed out. `legend/` shows the role colors while `style_by.active_when` has a value, plus the `muted_label` entry whenever any muted marker is on the map.
 - **Feature:** pick an organization to see its stations, colored by its role at each one.
 
+> **Done (0.19.0).** What the implementation decided:
+> - **Backend:** `organization` is the second filter, passed as `p_organization`. `style_by` is `roles` / "Role", active when `organization` is set, with fallback "No role with this organization". Its values are the roles from `map_filter_options`, in RoleID order. A feature carries `properties.roles` only when the row has roles (an organization was chosen), so the property appears exactly when the coloring applies.
+> - **Coloring** (`layers/style-by.ts`, generic): active while the `active_when` filter has a value. Each value takes the next Okabe–Ito color (`registry.ts`, cycling past 8), unless `STYLE_BY_OVERRIDES` pins one by label (empty for now). A feature's colors follow its property's order. Unknown values are skipped, and none gives `FALLBACK_COLOR` (`#9E9E9E`).
+> - **Markers:** one color is a solid circle. Several make a pie of equal SVG slices, starting at 12 o'clock and going clockwise, with thin white lines between slices and an outline ring. Muted pies keep their colors at 50% opacity with the gray outline.
+> - **Not color alone:** while coloring is active, a marker's title (its tooltip and accessible name) lists its value labels, e.g. "Test Station 1 (Owner, Maintainer)", or the fallback label.
+> - **Legend** (`legend/`, bottom left): "Role" with each role's swatch and the fallback while an organization is chosen, plus the layer's `muted_label` whenever a muted marker is drawn. `LayerLoad` gained `mutedCount` for this. The muted swatch takes its outline and opacity from the marker constants, so the two can't drift.
+> - **Checked live** on the local stack: org 1 → 1 `[1, 3]`, 2 `[2]`; org 3 → none; project 1 + org 2 → 1 `[2]`, 2 `[]`, matching the interaction table.
+
 **16. Project selects its managing organization — `0.20.0`**
 - Backend: each project option `implies` its `organization_id`. `map_stations()` already applies the rule that a project turns the organization into colors only. A test checks that both parameters are passed together.
 - Frontend: `MapState.setFilter` applies `implies` and records which values it set. Clearing the project clears values it implied, unless the user has since changed them. The organization dropdown stays editable.
 - **Feature:** picking a project shows its stations, colored by the roles of the organization that runs it.
+
+> **Done (0.20.0).** What the implementation decided:
+> - **Backend:** every project option has `implies: {"organization": organization_id}`. A test checks that `?project=1&organization=1` sends both `p_project` and `p_organization`.
+> - **`MapState.setFilter`** records implied values against the filter that set them (`impliedBy(layerId)`):
+>   - **Changing or clearing the filter** first clears what its previous value implied, where that value is still in place, then applies what the new value implies.
+>   - **"Changed by the user" means touched:** setting a filter yourself takes it over, even with the same value, so the project no longer manages it. Comparing values alone would wrongly clear an organization the user deliberately re-picked.
+>   - **Clashing implies:** if a second filter implies the same target, it takes it over from the first.
+>   - **Scope:** only a select's chosen option implies (a multiselect has no single option). `clearFilters` forgets every record.
+> - **Panel:** picking a project updates the organization dropdown, which stays editable. Each change is one `MapState` update, so `MapView` makes one request with both parameters.
+> - **Checked live** on the local stack: the manifest's project options carry their organizations, and Alpha with Org A → 1 `[1, 3]`, 2 `[2]`.
 
 ### Wrap-up
 

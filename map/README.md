@@ -21,6 +21,8 @@
 | `frontend/src/app/map/` | The Leaflet map page: draws every visible layer from the manifest |
 | `frontend/src/app/core/` | API types (`models.ts`), the HTTP client (`map-api.ts`), and shared state (`map-state.ts`) |
 | `frontend/src/app/layers/` | Marker styles per layer, the marker factory, and popups |
+| `frontend/src/app/filter-panel/` | The filter panel, built from the manifest's filters |
+| `frontend/src/app/legend/` | The legend: role colors and the "Inactive" entry |
 | `frontend/src/app/status-badge/` | The backend health badge |
 | `frontend/proxy.conf.json` | Dev proxy: `/api/*` → backend on port 5001 |
 

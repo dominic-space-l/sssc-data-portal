@@ -4,8 +4,11 @@
  * Loads the manifest through `MapState`, then fetches and draws each `default_visible`
  * layer's features with `MapApi`. Markers come from `layers/markers.ts`, styled by
  * `layers/registry.ts`, and open a popup built from the layer's `popup_fields` and
- * `location_note`. Features with `muted: true` are greyed out. Nothing here knows which
- * layers exist. Each layer is redrawn whenever its filter values in `MapState` change.
+ * `location_note`. Features with `muted: true` are greyed out. While a layer's
+ * `style_by` is active, markers are colored by it (`layers/style-by.ts`), and `Legend`
+ * explains the colors. Nothing here knows which
+ * layers exist. Each layer is redrawn whenever its filter values in `MapState` change
+ * (set by `FilterPanel`), and an empty result shows a message over the map.
  * Zoom is capped at `MAX_ZOOM`, because the points are approximate.
  *
  * Usage: routed at `''` in `app.routes.ts`; rendered as `<map-map>`.
@@ -16,6 +19,7 @@ import {
   DestroyRef,
   ElementRef,
   afterNextRender,
+  computed,
   effect,
   inject,
   signal,
@@ -26,11 +30,15 @@ import * as L from 'leaflet';
 import { Subscription } from 'rxjs';
 import { MapApi, describeApiError } from '../core/map-api';
 import { MapState } from '../core/map-state';
-import { FeatureCollection, LayerManifest } from '../core/models';
+import { FeatureCollection, FilterValues, LayerManifest } from '../core/models';
 import { createMarker } from '../layers/markers';
 import { buildPopup } from '../layers/popup';
 import { styleFor } from '../layers/registry';
+import { featureColors, featureEntries, isStyleByActive, styleByPalette } from '../layers/style-by';
+import { Legend } from '../legend/legend';
+import { FilterPanel } from '../filter-panel/filter-panel';
 import { StatusBadge } from '../status-badge/status-badge';
+import { emptyMessage } from './empty-message';
 
 /** Where the map starts, before any layer loads: Sitka, AK. */
 export const INITIAL_CENTER: L.LatLngExpression = [57.04907, -135.33905];
@@ -46,7 +54,7 @@ const FIT_MAX_ZOOM = 12;
 /** Map page: owns the Leaflet map and one feature group per drawn layer. */
 @Component({
   selector: 'map-map',
-  imports: [StatusBadge],
+  imports: [FilterPanel, Legend, StatusBadge],
   templateUrl: './map.html',
   styleUrl: './map.scss',
 })
@@ -61,6 +69,17 @@ export class MapView {
   private readonly drawn = new Map<string, L.FeatureGroup>();
   /** Whether the view has been fitted to features yet. */
   private fitted = false;
+
+  /** One message for each visible layer that loaded with no features. */
+  protected readonly emptyMessages = computed(() =>
+    this.state
+      .visibleLayers()
+      .filter((layer) => {
+        const load = this.state.layerLoads()[layer.id];
+        return load?.status === 'ready' && load.count === 0;
+      })
+      .map((layer) => emptyMessage(layer, this.state.filtersFor(layer.id))),
+  );
 
   /**
    * Creates the Leaflet map after first render, loads the manifest, and keeps each
@@ -111,10 +130,11 @@ export class MapView {
       this.state.setLayerLoad(layer.id, { status: 'loading' });
       return this.api.features(layer.id, filters).subscribe({
         next: (collection) => {
-          this.draw(map, layer, collection);
+          this.draw(map, layer, collection, filters);
           this.state.setLayerLoad(layer.id, {
             status: 'ready',
             count: collection.features.length,
+            mutedCount: collection.features.filter((f) => f.properties.muted === true).length,
           });
         },
         error: (err: unknown) => {
@@ -127,18 +147,36 @@ export class MapView {
   /**
    * Replaces a layer's markers with the given features.
    *
+   * While the layer's `style_by` is active, each marker takes its values' colors (a pie
+   * for several, gray for none), and its title lists the values' labels, so the
+   * coloring doesn't depend on color alone.
+   *
    * @param map The Leaflet map.
    * @param layer The layer's manifest entry.
    * @param collection Its features.
+   * @param filters The filters the features were requested with.
    */
-  private draw(map: L.Map, layer: LayerManifest, collection: FeatureCollection): void {
+  private draw(
+    map: L.Map,
+    layer: LayerManifest,
+    collection: FeatureCollection,
+    filters: FilterValues,
+  ): void {
     this.drawn.get(layer.id)?.remove();
     const style = styleFor(layer.id);
+    const palette = isStyleByActive(layer, filters) ? styleByPalette(layer) : null;
     const group = L.featureGroup();
     for (const feature of collection.features) {
       const [lon, lat] = feature.geometry.coordinates;
-      const title = String(feature.properties[layer.popup_fields[0]?.key] ?? layer.title);
-      createMarker([lat, lon], style, { title, muted: feature.properties.muted === true })
+      const name = String(feature.properties[layer.popup_fields[0]?.key] ?? layer.title);
+      let title = name;
+      let colors: readonly string[] | undefined;
+      if (palette && layer.style_by) {
+        const labels = featureEntries(feature, layer, palette).map((entry) => entry.label);
+        title = `${name} (${labels.length > 0 ? labels.join(', ') : layer.style_by.fallback_label})`;
+        colors = featureColors(feature, layer, palette);
+      }
+      createMarker([lat, lon], style, { title, colors, muted: feature.properties.muted === true })
         .bindPopup(() => buildPopup(feature, layer))
         .addTo(group);
     }

@@ -1,25 +1,35 @@
 """The stations layer: monitoring stations as waypoints, at masked locations.
 
-Role: everything about how stations appear on the map: popup fields, wording, and the
-GeoJSON properties. Its data comes only from the ``map_stations`` database function
-(supabase S5), which returns masked coordinates and a fixed set of columns. True
-coordinates never reach this module. Filters (steps 13-16 of the map plan) will map
-query parameters onto that function's parameters here.
+Role: everything about how stations appear on the map: popup fields, wording, filters,
+and the GeoJSON properties. Its data comes only from two database functions (supabase
+S5 and S6). ``map_stations`` returns masked coordinates and a fixed set of columns, so
+true coordinates never reach this module. ``map_filter_options`` supplies every filter's
+options.
 
 Properties of each feature:
     name     StationName
     code     StationCode, or "—" when it's missing
     active   "Yes", "No", or "Unknown" (IsActive is nullable)
     muted    true when the station is inactive, so the map greys it out
+    roles    only when an organization is chosen: the sorted ids of the roles it holds
+             at the station ([] for none). The layer's style_by colors markers by it.
+
+Filters (query parameter -> map_stations parameter):
+    project            select      -> p_project (projects with no stations are hinted;
+                                      each implies its managing organization)
+    organization       select      -> p_organization (filters only without a project;
+                                      always sets the roles, see map_stations)
+    station_type       multiselect -> p_station_types
+    observation_type   multiselect -> p_observation_types
 
 Usage:
     from backend.layers.stations import STATIONS
-    STATIONS.features(get_database(), {})
+    STATIONS.features(get_database(), {"station_type": [1, 2]})
 """
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping, Sequence
 from typing import Any
 
 from backend.db import Database
@@ -28,16 +38,81 @@ from backend.layers.base import (
     DetailField,
     DetailSection,
     FilterDef,
+    FilterOption,
+    FilterType,
     FilterValue,
     LayerOptions,
     PopupField,
     StyleBy,
+    StyleValue,
     point_feature,
 )
 
 MISSING_CODE = "—"
 
+# Shown after a project's name in the filter when it has no stations.
+NO_STATIONS_HINT = "No stations"
+
 _ACTIVE_LABELS = {True: "Yes", False: "No", None: "Unknown"}
+
+# The map_stations parameter each filter is passed as.
+_RPC_PARAMS = {
+    "project": "p_project",
+    "organization": "p_organization",
+    "station_type": "p_station_types",
+    "observation_type": "p_observation_types",
+}
+
+
+def _id_name_options(items: Sequence[Mapping[str, Any]]) -> list[FilterOption]:
+    """Turns ``[{"id", "name"}, ...]`` from map_filter_options into filter options.
+
+    Args:
+        items: One list from map_filter_options, already sorted by the database.
+
+    Returns:
+        One option per item, in the same order.
+
+    Usage:
+        _id_name_options(options["station_types"])
+    """
+    return [FilterOption(item["id"], item["name"]) for item in items]
+
+
+def _project_options(projects: Sequence[Mapping[str, Any]]) -> list[FilterOption]:
+    """Turns map_filter_options projects into options, with implies and hints.
+
+    Args:
+        projects: ``[{"id", "name", "organization_id", "station_count"}, ...]``, sorted
+            by name.
+
+    Returns:
+        One option per project, in the same order. Each implies its managing
+        organization, so choosing a project colors its stations by that
+        organization's roles (map_stations then uses the organization for colors
+        only). Projects with a station count of 0 get the hint "No stations".
+
+    Usage:
+        _project_options(options["projects"])
+    """
+    return [
+        FilterOption(
+            project["id"],
+            project["name"],
+            implies={"organization": project["organization_id"]},
+            hint=NO_STATIONS_HINT if project["station_count"] == 0 else None,
+        )
+        for project in projects
+    ]
+
+
+# How each filter's options are built from the map_filter_options result.
+_OPTION_BUILDERS: dict[str, Callable[[Mapping[str, Any]], list[FilterOption]]] = {
+    "project": lambda options: _project_options(options["projects"]),
+    "organization": lambda options: _id_name_options(options["organizations"]),
+    "station_type": lambda options: _id_name_options(options["station_types"]),
+    "observation_type": lambda options: _id_name_options(options["observation_types"]),
+}
 
 
 class StationsLayer:
@@ -45,7 +120,7 @@ class StationsLayer:
 
     Usage:
         layer = StationsLayer()
-        layer.features(db, {})
+        layer.features(db, {"observation_type": [3]})
     """
 
     id = "stations"
@@ -58,29 +133,48 @@ class StationsLayer:
         PopupField("code", "Code"),
         PopupField("active", "Active"),
     )
-    filters: tuple[FilterDef, ...] = ()
-    style_by: StyleBy | None = None
+    filters = (
+        FilterDef("project", "Project", FilterType.SELECT),
+        FilterDef("organization", "Organization", FilterType.SELECT),
+        FilterDef("station_type", "Station type", FilterType.MULTISELECT),
+        FilterDef("observation_type", "Observes", FilterType.MULTISELECT),
+    )
+    style_by = StyleBy(
+        property="roles",
+        label="Role",
+        active_when="organization",
+        fallback_label="No role with this organization",
+    )
 
     def options(self, db: Database) -> LayerOptions:
-        """Returns the manifest options. There are none until the filters are added.
+        """Reads every filter's options with one ``map_filter_options`` call.
 
         Args:
-            db: The database (unused for now).
+            db: The database.
 
         Returns:
-            Empty LayerOptions.
+            Options for each filter, in the order the database sorts them (by name),
+            and the roles as style_by values, in RoleID order (the color order).
+
+        Raises:
+            UpstreamError: Supabase failed.
 
         Usage:
             StationsLayer().options(db)
         """
-        return LayerOptions()
+        options = db.rpc("map_filter_options")
+        return LayerOptions(
+            filters={f.key: _OPTION_BUILDERS[f.key](options) for f in self.filters},
+            style_values=[StyleValue(role["id"], role["name"]) for role in options["roles"]],
+        )
 
     def features(self, db: Database, filters: Mapping[str, FilterValue]) -> list[dict]:
-        """Returns every station as a point feature at its masked location.
+        """Returns the matching stations as point features at their masked locations.
 
         Args:
             db: The database.
-            filters: Parsed filters. The layer has none yet.
+            filters: Parsed filters. Unset (None) filters aren't sent, so
+                ``map_stations`` treats them as "no filter".
 
         Returns:
             GeoJSON Point features, in station id order.
@@ -90,9 +184,9 @@ class StationsLayer:
             UpstreamError: Supabase failed (502).
 
         Usage:
-            StationsLayer().features(db, {})
+            StationsLayer().features(db, {"station_type": [1]})
         """
-        return [_to_feature(row) for row in db.rpc("map_stations", {})]
+        return [_to_feature(row) for row in db.rpc("map_stations", _rpc_params(filters))]
 
     def detail(self, db: Database, feature_id: int) -> Detail | None:
         """Returns one station's name, code, and status.
@@ -132,6 +226,25 @@ class StationsLayer:
         )
 
 
+def _rpc_params(filters: Mapping[str, FilterValue]) -> dict[str, Any]:
+    """Maps parsed filters onto map_stations parameters, leaving out unset ones.
+
+    Args:
+        filters: Parsed filters by key.
+
+    Returns:
+        The rpc params, e.g. ``{"p_station_types": [1, 2]}``.
+
+    Usage:
+        _rpc_params({"station_type": [1], "observation_type": None})
+    """
+    return {
+        _RPC_PARAMS[key]: value
+        for key, value in filters.items()
+        if value is not None and key in _RPC_PARAMS
+    }
+
+
 def _properties(row: Mapping[str, Any]) -> dict[str, Any]:
     """Builds a station's display-ready feature properties from a map_stations row.
 
@@ -139,17 +252,21 @@ def _properties(row: Mapping[str, Any]) -> dict[str, Any]:
         row: One row from map_stations.
 
     Returns:
-        ``name``, ``code``, ``active``, and ``muted``.
+        ``name``, ``code``, ``active``, and ``muted``, plus ``roles`` when the row has
+        them (an organization was chosen).
 
     Usage:
         _properties({"name": "Harbor", "code": None, "is_active": False, ...})
     """
-    return {
+    properties = {
         "name": row["name"],
         "code": row["code"] or MISSING_CODE,
         "active": _ACTIVE_LABELS[row["is_active"]],
         "muted": row["is_active"] is False,
     }
+    if row.get("roles") is not None:
+        properties["roles"] = list(row["roles"])
+    return properties
 
 
 def _to_feature(row: Mapping[str, Any]) -> dict[str, Any]:

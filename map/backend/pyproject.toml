@@ -1,6 +1,6 @@
 [project]
 name = "backend"
-version = "0.14.0"
+version = "0.20.0"
 description = "Flask API that serves masked environmental monitoring station data to the map frontend."
 readme = "README.md"
 authors = [

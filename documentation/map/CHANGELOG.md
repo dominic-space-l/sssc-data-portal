@@ -3,6 +3,121 @@
 Versioning follows `xx.yy.zz` (see [documentation/CLAUDECODE/CLAUDE.md](../CLAUDECODE/CLAUDE.md)):
 `xx` = major feature, `yy` = steps/commits toward a major feature, `zz` = small updates and revisions.
 
+## 0.20.0 — 2026-11-13
+
+Map commit 16: a project selects its managing organization. **Feature:** picking a project shows its stations, colored by the roles of the organization that runs it.
+- **Backend:** each project option `implies` its `organization_id`. A test checks that a project and its organization reach `map_stations` together, which filters by the project and colors by the organization.
+- **Frontend:** `MapState.setFilter` applies an option's `implies` and records what it set. Changing or clearing the project clears the organization it implied, unless the user has set the organization by hand since (even to the same one). The organization dropdown stays editable. `impliedBy(layerId)` exposes the records.
+- **Tests:** 150 backend (from 149). 83 frontend (from 74): implies applied, switched, and cleared, the user takeover, multiselect implies ignored, `clearFilters`, and the panel updating the organization dropdown.
+- **Checked live** against the local stack.
+
+**Files changed**
+- `map/backend/src/backend/layers/stations.py`
+- `map/backend/tests/test_stations.py`
+- `map/backend/pyproject.toml`
+- `map/backend/uv.lock`
+- `map/frontend/src/app/core/map-state.ts`
+- `map/frontend/src/app/core/map-state.spec.ts`
+- `map/frontend/src/app/filter-panel/filter-panel.spec.ts`
+- `map/frontend/README.md`
+- `documentation/map/map_app_plan.md`
+- `documentation/map/CHANGELOG.md`
+
+## 0.19.0 — 2026-11-13
+
+Map commit 15: organization filter with role colors. **Feature:** pick an organization to see its stations, colored by its role at each one.
+- **Backend:** an `organization` select filter (passed as `p_organization`) and a `style_by` on `roles` ("Role"), active while an organization is chosen. Its values are the roles from `map_filter_options`, in RoleID order. With an organization, each feature carries `properties.roles` (`[]` for none).
+- **Frontend:**
+  - Markers take Okabe–Ito colors in RoleID order while an organization is chosen: a solid circle for one role, a pie with one equal slice per role for several, and gray for none. Muted markers keep their slices but are greyed out.
+  - A marker's title also names its roles, so the coloring isn't conveyed by color alone.
+  - A new `legend/` shows the role colors and "No role with this organization" while an organization is chosen, plus "Inactive" whenever an inactive station is drawn.
+  - The coloring rules are in a new `layers/style-by.ts`, and the palette (with optional per-role overrides) is in `registry.ts`.
+- **Tests:** 149 backend (from 146): the organization parameter, `style_by` in the manifest, and `roles` only with an organization. 74 frontend (from 56): coloring rules, pie markers, the legend, and `MapView` coloring with role titles.
+- **Checked live** against the local stack: organization alone and project plus organization returned the stations and roles from the interaction table.
+
+**Files changed**
+- `map/backend/src/backend/layers/stations.py`
+- `map/backend/tests/test_stations.py`
+- `map/backend/pyproject.toml`
+- `map/backend/uv.lock`
+- `map/backend/README.md`
+- `map/frontend/src/app/core/map-state.ts`
+- `map/frontend/src/app/layers/registry.ts`
+- `map/frontend/src/app/layers/style-by.ts`
+- `map/frontend/src/app/layers/style-by.spec.ts`
+- `map/frontend/src/app/layers/markers.ts`
+- `map/frontend/src/app/layers/layers.spec.ts`
+- `map/frontend/src/app/legend/legend.ts`
+- `map/frontend/src/app/legend/legend.html`
+- `map/frontend/src/app/legend/legend.scss`
+- `map/frontend/src/app/legend/legend.spec.ts`
+- `map/frontend/src/app/map/map.ts`
+- `map/frontend/src/app/map/map.html`
+- `map/frontend/src/app/map/map.scss`
+- `map/frontend/src/app/map/map.spec.ts`
+- `map/frontend/README.md`
+- `map/README.md`
+- `documentation/map/map_app_plan.md`
+- `documentation/map/CHANGELOG.md`
+
+## 0.18.0 — 2026-11-13
+
+Map commit 14: project filter. **Feature:** pick a project to see only its stations, and see at a glance which projects have none.
+- **Backend:** a `project` select filter, listed first, with every project by name. Projects with no stations carry `hint: "No stations"`. The value is passed as `p_project`.
+- **Frontend:** the filter panel shows an option's hint after its label: "Project Empty — No stations" in a dropdown, and a muted tag in a checkbox list. When the selected project has a hint and no stations come back, the map says "No stations are associated with Project Empty."
+- **Tests:** 146 backend (from 143): the project parameter, hinted options, and a single value only. 56 frontend (from 54): hint display in both control types, and the hinted empty message.
+- **Checked live** against the local stack: each project returned its seed stations, and the empty project has the hint.
+
+**Files changed**
+- `map/backend/src/backend/layers/stations.py`
+- `map/backend/tests/test_stations.py`
+- `map/backend/pyproject.toml`
+- `map/backend/uv.lock`
+- `map/backend/README.md`
+- `map/frontend/src/app/filter-panel/filter-panel.ts`
+- `map/frontend/src/app/filter-panel/filter-panel.html`
+- `map/frontend/src/app/filter-panel/filter-panel.scss`
+- `map/frontend/src/app/filter-panel/filter-panel.spec.ts`
+- `map/frontend/src/app/map/empty-message.ts`
+- `map/frontend/src/app/map/empty-message.spec.ts`
+- `documentation/map/map_app_plan.md`
+- `documentation/map/CHANGELOG.md`
+
+## 0.17.0 — 2026-11-13
+
+Map commit 13: station type and observation type filters. **Feature:** filter stations by type and by what they observe.
+- **Backend:** the stations layer has `station_type` ("Station type") and `observation_type` ("Observes") multiselect filters. Their options come from one `map_filter_options` call. Selected values are passed as `p_station_types` and `p_observation_types`, and unset filters aren't sent. `pyproject.toml` is at `0.17.0` (it had stayed at `0.14.0` through the frontend-only steps).
+- **Frontend:**
+  - `filter-panel/` renders a control for each filter in the manifest: a dropdown with "All" for a select, a checkbox list for a multiselect, and a checkbox for a boolean. It has a "Clear filters" button and no layer-specific code.
+  - `MapState` gains `setFilter` (an empty list means no filter) and `clearFilters`. `MapView` redraws when they change.
+  - An empty result shows "No stations match these filters."
+- **Tests:** 143 backend (from 135): filters → RPC params, invalid filters refused before any database call, and manifest options. 54 frontend (from 39): the filter panel's controls and values, `MapState` filters, the empty message, and `MapView` redrawing and showing the empty state.
+- **Checked live** against the local stack: each filter combination returned the expected seed stations.
+- **Also:** the 0.16.0 entry and the plan's step 12 note now record the hand check in a browser (the seeded stations showed up).
+
+**Files changed**
+- `map/backend/src/backend/layers/stations.py`
+- `map/backend/tests/test_stations.py`
+- `map/backend/pyproject.toml`
+- `map/backend/uv.lock`
+- `map/backend/README.md`
+- `map/frontend/src/app/core/map-state.ts`
+- `map/frontend/src/app/core/map-state.spec.ts`
+- `map/frontend/src/app/filter-panel/filter-panel.ts`
+- `map/frontend/src/app/filter-panel/filter-panel.html`
+- `map/frontend/src/app/filter-panel/filter-panel.scss`
+- `map/frontend/src/app/filter-panel/filter-panel.spec.ts`
+- `map/frontend/src/app/map/map.ts`
+- `map/frontend/src/app/map/map.html`
+- `map/frontend/src/app/map/map.scss`
+- `map/frontend/src/app/map/map.spec.ts`
+- `map/frontend/src/app/map/empty-message.ts`
+- `map/frontend/src/app/map/empty-message.spec.ts`
+- `map/frontend/README.md`
+- `map/README.md`
+- `documentation/map/map_app_plan.md`
+- `documentation/map/CHANGELOG.md`
+
 ## 0.16.0 — 2026-11-12
 
 Map commit 12: stations on the map as waypoints, with popups. **Feature:** stations show up at their masked locations, inactive ones greyed out, and show their name, code, and active status when clicked.
@@ -18,7 +133,7 @@ Map commit 12: stations on the map as waypoints, with popups. **Feature:** stati
   - `MapState`: loading, errors, visible layers, and filters
   - `StatusBadge`
   - styles, markers (including no markup injection), and popups
-- **Checked** with `npm run dev:map` against the local Supabase stack, through the dev proxy.
+- **Checked** with `npm run dev:map` against the local Supabase stack, through the dev proxy, and by hand in a browser: the seeded test stations show up on the map.
 - **Docs:** the map and frontend READMEs (quickstart: stations need the backend's Supabase settings; directory guides), and the plan's step 12 note.
 
 **Files changed**

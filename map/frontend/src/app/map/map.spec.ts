@@ -16,6 +16,7 @@ import { Observable, of, throwError } from 'rxjs';
 import { MapApi } from '../core/map-api';
 import { MapState } from '../core/map-state';
 import { FeatureCollection, FilterValues, LayerManifest } from '../core/models';
+import { FALLBACK_COLOR, OKABE_ITO } from '../layers/registry';
 import { MAX_ZOOM, MapView } from './map';
 
 const STATIONS: LayerManifest = {
@@ -52,9 +53,12 @@ const FEATURES: FeatureCollection = {
   ],
 };
 
-/** A MapApi stand-in that records which layers' features were requested. */
+/** A MapApi stand-in that records which layers' features were requested, with filters. */
 class FakeMapApi {
   readonly requested: string[] = [];
+  readonly filtersRequested: FilterValues[] = [];
+  /** Set to change what later `features()` calls return. */
+  next$: Observable<FeatureCollection> | null = null;
 
   /**
    * @param manifest The layers `layers()` returns.
@@ -79,13 +83,13 @@ class FakeMapApi {
    * Records the request.
    *
    * @param layerId The layer requested.
-   * @param filters Its filters (unused).
-   * @return The canned features.
+   * @param filters Its filters.
+   * @return The canned features (`next$` if set).
    */
   features(layerId: string, filters: FilterValues = {}) {
-    void filters;
     this.requested.push(layerId);
-    return this.features$;
+    this.filtersRequested.push(filters);
+    return this.next$ ?? this.features$;
   }
 }
 
@@ -126,6 +130,7 @@ describe('MapView', () => {
     expect(TestBed.inject(MapState).layerLoads()['stations']).toEqual({
       status: 'ready',
       count: 2,
+      mutedCount: 1,
     });
   });
 
@@ -172,6 +177,94 @@ describe('MapView', () => {
       status: 'error',
       error: { status: 503, code: 'masking_unavailable', message: 'Unavailable.' },
     });
+  });
+
+  it('redraws a layer with its new filters when they change', async () => {
+    const api = new FakeMapApi([STATIONS], of(FEATURES));
+    const fixture = await render(api);
+    api.next$ = of({ type: 'FeatureCollection', features: [FEATURES.features[1]] });
+
+    TestBed.inject(MapState).setFilter('stations', 'station_type', [1]);
+    await fixture.whenStable();
+
+    expect(api.filtersRequested).toEqual([{}, { station_type: [1] }]);
+    expect(markers(fixture).map((m) => m.title)).toEqual(['Test Station 3']);
+  });
+
+  it('shows the empty state when a layer comes back with no features', async () => {
+    const api = new FakeMapApi([STATIONS], of(FEATURES));
+    const fixture = await render(api);
+    const element = fixture.nativeElement as HTMLElement;
+    expect(element.querySelector('.empty')).toBeNull();
+
+    api.next$ = of({ type: 'FeatureCollection', features: [] });
+    TestBed.inject(MapState).setFilter('stations', 'station_type', [9]);
+    await fixture.whenStable();
+
+    expect(markers(fixture)).toEqual([]);
+    expect(element.querySelector('.empty')!.textContent).toBe('No stations match these filters.');
+  });
+
+  it('colors markers by role while an organization is chosen, naming the roles', async () => {
+    const withRoles: LayerManifest = {
+      ...STATIONS,
+      style_by: {
+        property: 'roles',
+        label: 'Role',
+        active_when: 'organization',
+        values: [
+          { value: 1, label: 'Owner' },
+          { value: 2, label: 'Operator' },
+          { value: 3, label: 'Maintainer' },
+        ],
+        fallback_label: 'No role with this organization',
+      },
+    };
+    const api = new FakeMapApi([withRoles], of(FEATURES));
+    const fixture = await render(api);
+    // Uncolored until an organization is chosen.
+    expect(markers(fixture)[0].querySelectorAll('path').length).toBe(0);
+
+    api.next$ = of({
+      type: 'FeatureCollection',
+      features: [
+        {
+          ...FEATURES.features[0],
+          properties: { ...FEATURES.features[0].properties, roles: [1, 3] },
+        },
+        { ...FEATURES.features[1], properties: { ...FEATURES.features[1].properties, roles: [] } },
+      ],
+    });
+    TestBed.inject(MapState).setFilter('stations', 'organization', 1);
+    await fixture.whenStable();
+
+    const [pie, none] = markers(fixture);
+    expect([...pie.querySelectorAll('path')].map((p) => p.getAttribute('fill'))).toEqual([
+      OKABE_ITO[0],
+      OKABE_ITO[2],
+    ]);
+    expect(none.querySelector('circle')!.getAttribute('fill')).toBe(FALLBACK_COLOR);
+    expect(markers(fixture).map((m) => m.title)).toEqual([
+      'Test Station 1 (Owner, Maintainer)',
+      'Test Station 3 (No role with this organization)',
+    ]);
+  });
+
+  it('shows the legend for muted markers', async () => {
+    const fixture = await render(new FakeMapApi([STATIONS], of(FEATURES)));
+    const legend = (fixture.nativeElement as HTMLElement).querySelector('map-legend');
+    expect(legend!.textContent).toContain('Inactive');
+  });
+
+  it('shows the filter panel', async () => {
+    const withFilter: LayerManifest = {
+      ...STATIONS,
+      filters: [{ key: 'station_type', label: 'Station type', type: 'multiselect', options: [] }],
+    };
+    const fixture = await render(new FakeMapApi([withFilter], of(FEATURES)));
+    expect(
+      (fixture.nativeElement as HTMLElement).querySelector('map-filter-panel details'),
+    ).not.toBeNull();
   });
 
   it('shows the status badge', async () => {

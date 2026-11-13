@@ -1,0 +1,64 @@
+@if (layers().length > 0) {
+  <details class="panel" open>
+    <summary>Filters</summary>
+    @for (layer of layers(); track layer.id) {
+      <section class="layer" [attr.aria-label]="layer.title + ' filters'">
+        <h2>{{ layer.title }}</h2>
+        @for (filter of layer.filters; track filter.key) {
+          @switch (filter.type) {
+            @case ('select') {
+              <div class="field">
+                <label [for]="layer.id + '-' + filter.key">{{ filter.label }}</label>
+                <select
+                  [id]="layer.id + '-' + filter.key"
+                  (change)="onSelect(layer, filter, $event)"
+                >
+                  <option value="" [selected]="selectValue(layer, filter) === ''">All</option>
+                  @for (option of filter.options ?? []; track option.value) {
+                    <option
+                      [value]="option.value"
+                      [selected]="selectValue(layer, filter) === '' + option.value"
+                    >
+                      {{ optionText(option) }}
+                    </option>
+                  }
+                </select>
+              </div>
+            }
+            @case ('multiselect') {
+              <fieldset class="field">
+                <legend>{{ filter.label }}</legend>
+                @for (option of filter.options ?? []; track option.value) {
+                  <label class="option">
+                    <input
+                      type="checkbox"
+                      [checked]="isTicked(layer, filter, option)"
+                      (change)="onTick(layer, filter, option, $event)"
+                    />
+                    {{ option.label }}
+                    @if (option.hint) {
+                      <span class="hint">{{ option.hint }}</span>
+                    }
+                  </label>
+                }
+              </fieldset>
+            }
+            @case ('boolean') {
+              <label class="field option">
+                <input
+                  type="checkbox"
+                  [checked]="valueOf(layer, filter) === true"
+                  (change)="onToggle(layer, filter, $event)"
+                />
+                {{ filter.label }}
+              </label>
+            }
+          }
+        }
+        @if (hasFilters(layer)) {
+          <button type="button" class="clear" (click)="clear(layer)">Clear filters</button>
+        }
+      </section>
+    }
+  </details>
+}

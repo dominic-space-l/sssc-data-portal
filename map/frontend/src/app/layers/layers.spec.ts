@@ -85,6 +85,37 @@ describe('createMarker', () => {
     expect(svg.querySelector('circle')!.getAttribute('fill')).toBe('#123456');
   });
 
+  it('fills a single given color as a solid circle', () => {
+    const marker = createMarker([57.05, -135.33], style, { title: 'A', colors: ['#E69F00'] });
+    const icon = iconElement(marker);
+    expect(icon.querySelectorAll('path').length).toBe(0);
+    expect(icon.querySelector('circle')!.getAttribute('fill')).toBe('#E69F00');
+  });
+
+  it('draws a pie with one slice per color, in order, inside an outline ring', () => {
+    const colors = ['#E69F00', '#56B4E9', '#009E73'];
+    const icon = iconElement(createMarker([57.05, -135.33], style, { title: 'A', colors }));
+    expect([...icon.querySelectorAll('path')].map((p) => p.getAttribute('fill'))).toEqual(colors);
+    const ring = icon.querySelector('circle')!;
+    expect(ring.getAttribute('fill')).toBe('none');
+    expect(ring.getAttribute('stroke')).toBe(OUTLINE_COLOR);
+  });
+
+  it('keeps a muted pie colored but greyed out', () => {
+    const colors = ['#E69F00', '#56B4E9'];
+    const icon = iconElement(
+      createMarker([57.05, -135.33], style, { title: 'A', colors, muted: true }),
+    );
+    expect([...icon.querySelectorAll('path')].map((p) => p.getAttribute('fill'))).toEqual(colors);
+    expect(icon.querySelector('svg')!.getAttribute('opacity')).toBe(String(MUTED_OPACITY));
+    expect(icon.querySelector('circle')!.getAttribute('stroke')).toBe(MUTED_OUTLINE_COLOR);
+  });
+
+  it('falls back to the layer color when given no colors', () => {
+    const icon = iconElement(createMarker([57.05, -135.33], style, { title: 'A', colors: [] }));
+    expect(icon.querySelector('circle')!.getAttribute('fill')).toBe('#123456');
+  });
+
   it('is keyboard-accessible and named by its title', () => {
     const marker = createMarker([57.05, -135.33], style, { title: 'Test Station 1' });
     expect(marker.options.keyboard).toBe(true);

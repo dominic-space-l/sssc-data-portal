@@ -84,6 +84,126 @@ describe('MapState', () => {
     expect(state.filtersFor('stations')).toEqual({});
   });
 
+  it('sets filters per layer and key', () => {
+    const state = stateWith(of([]));
+    state.setFilter('stations', 'project', 4);
+    state.setFilter('stations', 'station_type', [1, 2]);
+    state.setFilter('sites', 'project', 7);
+    expect(state.filtersFor('stations')).toEqual({ project: 4, station_type: [1, 2] });
+    expect(state.filtersFor('sites')).toEqual({ project: 7 });
+  });
+
+  it('stores an empty list as null, meaning no filter', () => {
+    const state = stateWith(of([]));
+    state.setFilter('stations', 'station_type', []);
+    expect(state.filtersFor('stations')).toEqual({ station_type: null });
+  });
+
+  it('clears one layer without touching another', () => {
+    const state = stateWith(of([]));
+    state.setFilter('stations', 'project', 4);
+    state.setFilter('sites', 'project', 7);
+    state.clearFilters('stations');
+    expect(state.filtersFor('stations')).toEqual({});
+    expect(state.filtersFor('sites')).toEqual({ project: 7 });
+  });
+
+  describe('implies', () => {
+    const STATIONS: LayerManifest = {
+      ...layer('stations', true),
+      filters: [
+        {
+          key: 'project',
+          label: 'Project',
+          type: 'select',
+          options: [
+            { value: 1, label: 'Project Alpha', implies: { organization: 1 } },
+            { value: 2, label: 'Project Beta', implies: { organization: 2 } },
+            { value: 5, label: 'No owner' },
+          ],
+        },
+        { key: 'organization', label: 'Organization', type: 'select', options: [] },
+        {
+          key: 'station_type',
+          label: 'Station type',
+          type: 'multiselect',
+          options: [{ value: 1, label: 'Weather', implies: { organization: 9 } }],
+        },
+      ],
+    };
+
+    /** @return A state with the stations manifest loaded. */
+    function loaded(): MapState {
+      const state = stateWith(of([STATIONS]));
+      state.loadManifest();
+      return state;
+    }
+
+    it('choosing a project also sets its organization', () => {
+      const state = loaded();
+      state.setFilter('stations', 'project', 1);
+      expect(state.filtersFor('stations')).toEqual({ project: 1, organization: 1 });
+      expect(state.impliedBy('stations')).toEqual({ project: { organization: 1 } });
+    });
+
+    it('switching projects switches the implied organization', () => {
+      const state = loaded();
+      state.setFilter('stations', 'project', 1);
+      state.setFilter('stations', 'project', 2);
+      expect(state.filtersFor('stations')).toEqual({ project: 2, organization: 2 });
+    });
+
+    it('clearing the project clears the organization it set', () => {
+      const state = loaded();
+      state.setFilter('stations', 'project', 1);
+      state.setFilter('stations', 'project', null);
+      expect(state.filtersFor('stations')).toEqual({ project: null, organization: null });
+      expect(state.impliedBy('stations')).toEqual({});
+    });
+
+    it('keeps an organization the user changed after choosing the project', () => {
+      const state = loaded();
+      state.setFilter('stations', 'project', 1);
+      state.setFilter('stations', 'organization', 2);
+      expect(state.filtersFor('stations')).toEqual({ project: 1, organization: 2 });
+
+      state.setFilter('stations', 'project', null);
+      expect(state.filtersFor('stations')).toEqual({ project: null, organization: 2 });
+    });
+
+    it('keeps an organization the user re-picked by hand, even if it is the same one', () => {
+      const state = loaded();
+      state.setFilter('stations', 'project', 1);
+      state.setFilter('stations', 'organization', 1);
+      state.setFilter('stations', 'project', null);
+      expect(state.filtersFor('stations')['organization']).toBe(1);
+    });
+
+    it('keeps an organization picked before the project only if the project does not imply one', () => {
+      const state = loaded();
+      state.setFilter('stations', 'organization', 2);
+      state.setFilter('stations', 'project', 5);
+      expect(state.filtersFor('stations')).toEqual({ organization: 2, project: 5 });
+
+      state.setFilter('stations', 'project', 1);
+      expect(state.filtersFor('stations')['organization']).toBe(1);
+    });
+
+    it('ignores implies on multiselect options', () => {
+      const state = loaded();
+      state.setFilter('stations', 'station_type', [1]);
+      expect(state.filtersFor('stations')).toEqual({ station_type: [1] });
+    });
+
+    it('clearFilters forgets what was implied', () => {
+      const state = loaded();
+      state.setFilter('stations', 'project', 1);
+      state.clearFilters('stations');
+      expect(state.filtersFor('stations')).toEqual({});
+      expect(state.impliedBy('stations')).toEqual({});
+    });
+  });
+
   it('records each layer load separately', () => {
     const state = stateWith(of([]));
     state.setLayerLoad('stations', { status: 'loading' });
