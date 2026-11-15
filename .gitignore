@@ -15,8 +15,7 @@ coverage/
 documentation/map/its-a-secret-to-everyone.txt
 
 # Editors
-.vscode/*
-!.vscode/extensions.json
+.vscode/
 .idea/
 
 # OS
