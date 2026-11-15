@@ -51,7 +51,7 @@ export const INITIAL_ZOOM = 10;
  */
 export const MAX_ZOOM = 14;
 /** Closest zoom when fitting the map to the first layer's features. */
-const FIT_MAX_ZOOM = 12;
+export const FIT_MAX_ZOOM = 12;
 
 /** Map page: owns the Leaflet map and one feature group per drawn layer. */
 @Component({

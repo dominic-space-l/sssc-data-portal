@@ -96,6 +96,11 @@ describe('featureColors', () => {
     expect(featureColors(withRoles(null), LAYER, palette)).toEqual([FALLBACK_COLOR]);
   });
 
+  it('uses the fallback gray when the property is not a list', () => {
+    expect(featureEntries(withRoles(1), LAYER, palette)).toEqual([]);
+    expect(featureColors(withRoles('1,3'), LAYER, palette)).toEqual([FALLBACK_COLOR]);
+  });
+
   it('skips values the palette does not know', () => {
     expect(featureEntries(withRoles([9, 2]), LAYER, palette).map((e) => e.label)).toEqual([
       'Operator',

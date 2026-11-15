@@ -49,7 +49,7 @@ To add a layer or change what one shows, see [documentation/map/adding_a_layer.m
 | `backend/src/backend/layers/` | The layer framework (`base.py`), the stations layer (`stations.py`), and the registry of layers the API serves (`__init__.py`) |
 | `backend/scripts/` | `smoke_supabase.py`: checks the anon key's access on a real Supabase project, and, with `--check-coordinates`, the masking |
 | `backend/.env.example` | Template for the backend's local settings (`.env`) |
-| `backend/tests/` | pytest tests (unit tests, and integration tests run with `-m integration`) |
+| `backend/tests/` | pytest tests: unit tests (including the smoke script's), and integration tests run with `-m integration` |
 | `frontend/` | Angular + Leaflet app. See [frontend/README.md](frontend/README.md). |
 | `frontend/src/app/map/` | The Leaflet map page: draws every visible layer from the manifest, plus empty and error states |
 | `frontend/src/app/core/` | API types (`models.ts`), the HTTP client (`map-api.ts`), and shared state (`map-state.ts`) |
@@ -112,22 +112,38 @@ The backend reads `SUPABASE_URL`, `SUPABASE_KEY` (the anon key only), and `CACHE
 From the **repo root**:
 
 ```sh
-npm run test:backend            # backend unit tests (pytest)
+npm run test:backend            # backend unit tests (pytest), with coverage (fails under 95%)
 npm run lint:backend            # ruff lint and format check
-npm test -w map-frontend        # frontend unit tests (Vitest)
+npm test -w map-frontend        # frontend unit tests (Vitest), with coverage thresholds
 npm run lint && npm run format:check
 npm run build -w map-frontend   # production build
 ```
 
-Against a real Supabase project (the local stack or the hosted one), from `map/backend/`:
+**Integration tests** run the real backend against a real Supabase project. Locally, use the local stack:
 
 ```sh
-SUPABASE_URL=... SUPABASE_KEY=<anon key> uv run pytest -m integration   # the whole stack
-uv run python scripts/smoke_supabase.py                                  # anon key's access
-uv run python scripts/smoke_supabase.py --check-coordinates              # masking; prompts for the service-role key
+npm run db:start                                  # migrations + seed, with a throwaway masking secret
+export SUPABASE_URL=http://127.0.0.1:54321
+export SUPABASE_KEY=<ANON_KEY from: npx supabase status -o env>
+npm run test:backend:integration                  # the whole stack, through the real routes
+cd map/backend
+uv run python scripts/smoke_supabase.py                       # the anon key's access
+uv run python scripts/smoke_supabase.py --check-coordinates   # the masking; prompts for SERVICE_ROLE_KEY
 ```
 
-CI runs the unit tests, lint, format check, and build on every PR. The integration tests and smoke script need credentials, so run them by hand before a release and after any change to the database's access rules or map functions.
+**Coverage.** The backend measures `src/` and `scripts/` with branch coverage, and fails under 95% (`[tool.coverage]` in `backend/pyproject.toml`). The frontend's thresholds are in `frontend/angular.json` (`coverageThresholds`), set just below the measured coverage. Coverage runs with the full suite. To run one backend file without the threshold, use plain `uv run pytest tests/test_x.py`. For one frontend spec, add `--coverage=false`.
+
+**CI** (`.github/workflows/ci.yml`) runs on every PR and push to `main`:
+
+| Job | What it runs |
+| --- | --- |
+| Frontend (map + portal) | ESLint, Prettier, Vitest with coverage thresholds, and the production build |
+| Map backend (Python) | Ruff lint and format, and pytest with coverage (95%) |
+| Map integration (local Supabase) | Starts a local stack from `supabase/migrations` and `seed.sql`. Runs `pytest -m integration`, then the smoke script with `--check-coordinates` (the local service-role key goes in on standard input). It needs no secrets and never touches the hosted project. |
+
+Run the integration tests and the smoke script against the **hosted** project by hand, before a release and after any change to the database's access rules or map functions. CI only covers the local stack.
+
+The plan behind this setup, including the browser end-to-end tests planned for later, is [testing_plan.md](../documentation/map/testing_plan.md).
 
 ### Development
 - **Change what the map shows** (fields, wording, filters, colors, or a new layer): follow [adding_a_layer.md](../documentation/map/adding_a_layer.md). Content changes go in the backend layer module. New columns need a Supabase migration that changes the map function.

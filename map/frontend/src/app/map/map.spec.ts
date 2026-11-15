@@ -3,21 +3,22 @@
  *
  * Renders the real component and Leaflet map (in jsdom) and checks that it loads the
  * manifest, draws one marker per feature of each default-visible layer only, greys out
- * muted features, opens a popup with the fields and note on click, caps the zoom, and
- * records a failed layer load in `MapState`.
+ * muted features, opens a popup with the fields and note on click, caps the zoom,
+ * records a failed layer load in `MapState`, and fits the view to the first features
+ * drawn only.
  *
  * Usage: `npm test -w map-frontend` from the repo root.
  */
 
 import { HttpErrorResponse } from '@angular/common/http';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import type * as L from 'leaflet';
+import * as L from 'leaflet';
 import { Observable, of, throwError } from 'rxjs';
 import { MapApi } from '../core/map-api';
 import { MapState } from '../core/map-state';
 import { FeatureCollection, FilterValues, LayerManifest } from '../core/models';
 import { FALLBACK_COLOR, OKABE_ITO } from '../layers/registry';
-import { MAX_ZOOM, MapView } from './map';
+import { FIT_MAX_ZOOM, INITIAL_CENTER, INITIAL_ZOOM, MAX_ZOOM, MapView } from './map';
 
 const STATIONS: LayerManifest = {
   id: 'stations',
@@ -338,4 +339,90 @@ describe('MapView', () => {
     const badge = (fixture.nativeElement as HTMLElement).querySelector('map-status-badge');
     expect(badge!.textContent).toContain('backend: ok');
   });
+
+  it('keeps the starting view while the map has no size', async () => {
+    const fixture = await render(new FakeMapApi([STATIONS], of(FEATURES)));
+    const map = leafletMap(fixture);
+    expect(map.getCenter()).toEqual(L.latLng(INITIAL_CENTER));
+    expect(map.getZoom()).toBe(INITIAL_ZOOM);
+  });
 });
+
+describe('MapView fitting the view', () => {
+  // jsdom lays nothing out, so every element is 0x0 and the map never fits. Give the
+  // map's container a size, as a browser would.
+  beforeEach(() => {
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(800);
+    vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(600);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  /** The bounds of FEATURES, in Leaflet's lat/lng order. */
+  const featureBounds = L.latLngBounds(
+    FEATURES.features.map(({ geometry }) =>
+      L.latLng(geometry.coordinates[1], geometry.coordinates[0]),
+    ),
+  );
+
+  it('fits the first features drawn, no closer than the fit zoom', async () => {
+    const fixture = await render(new FakeMapApi([STATIONS], of(FEATURES)));
+    const map = leafletMap(fixture);
+
+    expect(map.getBounds().contains(featureBounds)).toBe(true);
+    expect(map.getZoom()).toBeLessThanOrEqual(FIT_MAX_ZOOM);
+    expect(map.getCenter()).not.toEqual(L.latLng(INITIAL_CENTER));
+  });
+
+  it("keeps the user's view when a filter change redraws the layer", async () => {
+    const api = new FakeMapApi([STATIONS], of(FEATURES));
+    const fixture = await render(api);
+    const map = leafletMap(fixture);
+    const center = map.getCenter();
+    const zoom = map.getZoom();
+
+    api.next$ = of({
+      type: 'FeatureCollection',
+      features: [
+        {
+          ...FEATURES.features[0],
+          id: 9,
+          geometry: { type: 'Point', coordinates: [-134.4, 58.3] },
+        },
+      ],
+    });
+    TestBed.inject(MapState).setFilter('stations', 'station_type', [2]);
+    await fixture.whenStable();
+
+    expect(markers(fixture).length).toBe(1);
+    expect(map.getCenter()).toEqual(center);
+    expect(map.getZoom()).toBe(zoom);
+  });
+
+  it('waits for features before fitting, then fits the first ones drawn', async () => {
+    const api = new FakeMapApi([STATIONS], of({ type: 'FeatureCollection', features: [] }));
+    const fixture = await render(api);
+    const map = leafletMap(fixture);
+    expect(map.getCenter()).toEqual(L.latLng(INITIAL_CENTER));
+
+    api.next$ = of(FEATURES);
+    TestBed.inject(MapState).setFilter('stations', 'station_type', [1]);
+    await fixture.whenStable();
+
+    // The starting view already contains these stations, so check that the view moved.
+    expect(map.getCenter()).not.toEqual(L.latLng(INITIAL_CENTER));
+    expect(map.getBounds().contains(featureBounds)).toBe(true);
+  });
+});
+
+/**
+ * Reaches the component's Leaflet map.
+ *
+ * @param fixture The rendered MapView.
+ * @return The map.
+ */
+function leafletMap(fixture: ComponentFixture<MapView>): L.Map {
+  return (fixture.componentInstance as unknown as { map: () => L.Map }).map();
+}

@@ -1,6 +1,6 @@
 [project]
 name = "backend"
-version = "1.0.0"
+version = "1.1.0"
 description = "Flask API that serves masked environmental monitoring station data to the map frontend."
 readme = "README.md"
 authors = [
@@ -23,6 +23,7 @@ build-backend = "uv_build"
 [dependency-groups]
 dev = [
     "pytest>=9.2.0",
+    "pytest-cov>=7.1.0",
     "ruff>=0.17.3",
 ]
 
@@ -39,6 +40,8 @@ convention = "google"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# Lets tests import scripts/smoke_supabase.py as `smoke_supabase`.
+pythonpath = ["scripts"]
 # Integration tests call a real Supabase project, so they only run when asked for:
 #   SUPABASE_URL=... SUPABASE_KEY=<anon key> uv run pytest -m integration
 addopts = ["-m", "not integration"]
@@ -49,3 +52,16 @@ markers = ["integration: needs a real Supabase project (SUPABASE_URL and SUPABAS
 filterwarnings = [
     "ignore:The '(timeout|verify)' parameter is deprecated:DeprecationWarning",
 ]
+
+# Coverage runs with the full unit suite: `uv run pytest --cov` (CI, `npm run test:backend`).
+# Plain `uv run pytest` skips it, so running one file, or `-m integration`, isn't failed by
+# the threshold.
+[tool.coverage.run]
+source = ["src", "scripts"]
+branch = true
+
+[tool.coverage.report]
+fail_under = 95
+show_missing = true
+skip_covered = true
+exclude_also = ['if __name__ == "__main__":']
