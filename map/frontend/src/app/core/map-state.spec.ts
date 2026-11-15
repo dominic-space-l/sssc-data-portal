@@ -139,6 +139,12 @@ describe('MapState', () => {
       return state;
     }
 
+    it('reports nothing implied for a layer with no filters set', () => {
+      const state = loaded();
+      expect(state.impliedBy('stations')).toEqual({});
+      expect(state.impliedBy('no-such-layer')).toEqual({});
+    });
+
     it('choosing a project also sets its organization', () => {
       const state = loaded();
       state.setFilter('stations', 'project', 1);

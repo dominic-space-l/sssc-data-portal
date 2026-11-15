@@ -3,6 +3,57 @@
 Versioning follows `xx.yy.zz` (see [documentation/CLAUDECODE/CLAUDE.md](../CLAUDECODE/CLAUDE.md)):
 `xx` = major feature, `yy` = steps/commits toward a major feature, `zz` = small updates and revisions.
 
+## 1.1.0 — 2026-11-15
+
+Full test coverage and CI for the map ([testing_plan.md](testing_plan.md)). Coverage is measured and enforced for both apps. CI now runs the backend's integration tests and the end-to-end masking check against a local Supabase stack on every PR.
+- **Coverage gates:**
+  - Backend: `pytest-cov`, measuring `src/` and `scripts/` with branch coverage, fails under 95%. It runs with `uv run pytest --cov`, `npm run test:backend`, and in CI.
+  - Frontend: `@vitest/coverage-v8`, with thresholds in `angular.json` (statements 99%, branches 95%, functions 98%, lines 99%), enforced by `npm test`. Every `.ts` file under `src/` counts except specs and `main.ts`.
+- **New CI job, Map integration (local Supabase):** starts Postgres, PostgREST, and the API gateway from `supabase/migrations` and `seed.sql`. Then it runs:
+  - the 7 integration tests
+  - `smoke_supabase.py --check-coordinates`: the anon key's access, plus no served point at its true location and every point 235–515 m from it
+
+  It needs no secrets. It checks that the local URL and keys are set first, so the integration tests can't silently skip.
+- **Smoke script:** `--service-key-stdin` reads the service-role key from standard input, for CI. The prompt is still the default, and the key still never goes on the command line. The key is now read before any check runs, and a missing key exits 2. The module docstring is now a raw string, so the usage lines show the `\` continuations as written.
+- **Tests:**
+  - Backend: 201 unit tests (from 161).
+    - `test_smoke_supabase.py`: every check passing and failing, the masking comparison, argument parsing, how the key is read, the exit codes, and that the output contains no coordinates or keys.
+    - `test_main.py`: the dev server's host and port, and that `PORT` matches the frontend proxy.
+  - Frontend: 99 tests (from 89).
+    - Fitting the view to the first features drawn, but not on later redraws. Checked by breaking `fitOnce` and watching the tests fail.
+    - The app's providers and routes, including the redirect of unknown paths.
+    - `style_by` with a non-list property, and `impliedBy` for a layer with nothing implied.
+- **Coverage now:** backend 99.85%. Frontend 99.7% statements, 96.7% branches, 99.0% functions, 100% lines.
+- **Dependencies:** `pytest-cov` 7.1 and `@vitest/coverage-v8` 5.1. Vitest moved from 5.0.5 to 5.1.0, within its existing `^5.0.0` range, to match the coverage provider.
+- **Root scripts:** `test:backend` runs with coverage. `test:backend:integration` is new.
+- **`map/frontend/src/app/map/map.ts`:** `FIT_MAX_ZOOM` is exported, for the tests.
+- **Not verified locally:** the integration job's Supabase start-up (Docker wasn't running). Its first CI run is the check.
+- **Later:** browser end-to-end tests (Playwright), listed in the plan.
+
+**Files changed**
+- `.github/workflows/ci.yml`
+- `package.json`
+- `package-lock.json`
+- `README.md`
+- `supabase/README.md`
+- `map/README.md`
+- `map/backend/README.md`
+- `map/backend/pyproject.toml`
+- `map/backend/uv.lock`
+- `map/backend/scripts/smoke_supabase.py`
+- `map/backend/tests/test_smoke_supabase.py`
+- `map/backend/tests/test_main.py`
+- `map/frontend/README.md`
+- `map/frontend/package.json`
+- `map/frontend/angular.json`
+- `map/frontend/src/app/map/map.ts`
+- `map/frontend/src/app/map/map.spec.ts`
+- `map/frontend/src/app/app.config.spec.ts`
+- `map/frontend/src/app/core/map-state.spec.ts`
+- `map/frontend/src/app/layers/style-by.spec.ts`
+- `documentation/map/testing_plan.md`
+- `documentation/map/CHANGELOG.md`
+
 ## 1.0.0 — 2026-11-13
 
 Map commit 18: documentation, and the **1.0 release** of the public map. Stations at masked locations, with popups, four filters (project, organization, station type, observation type), role colors and a legend, error and empty states, caching, and the database's privacy guarantees.

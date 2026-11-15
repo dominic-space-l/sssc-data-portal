@@ -38,7 +38,7 @@ npm install
 | Authentication prototype | Needs a Supabase test project; see [authentication/README.md](authentication/README.md#quickstart) | http://localhost:3000 |
 | Local Supabase (Postgres, Studio) | `npm run db:start` (stop with `npm run db:stop`) | http://localhost:54323 (Studio) |
 
-Other root scripts: `npm run build` and `npm test` run across all frontends. `npm run db:reset` rebuilds the local database from the migrations and seed, `npm run db:test` runs the pgTAP database tests, and `npm run db:lint` lints SQL functions and runs Supabase's security advisors.
+Other root scripts: `npm run build` and `npm test` run across all frontends (the map's tests with coverage thresholds). `npm run test:backend` runs the map backend's unit tests with coverage, and `npm run test:backend:integration` runs its integration tests against a Supabase project (see [map/README.md](map/README.md#testing)). `npm run db:reset` rebuilds the local database from the migrations and seed, `npm run db:test` runs the pgTAP database tests, and `npm run db:lint` lints SQL functions and runs Supabase's security advisors.
 For details, see each section's README ([map](map/README.md), [portal](portal/README.md), [authentication](authentication/README.md), [supabase](supabase/README.md)).
 
 ### Directory Guide
@@ -51,7 +51,7 @@ For details, see each section's README ([map](map/README.md), [portal](portal/RE
 | `authentication/prototype/` | Bare-bones HTML test pages: login, admin dashboard, direct entry, request access, submit by link |
 | `authentication/supabase/` | Authentication's Edge Functions and hand-run SQL, as a separate Supabase CLI project (for now) |
 | `supabase/` | Supabase CLI project: config, schema migrations, seed data, and pgTAP tests |
-| `.github/workflows/` | CI (`ci.yml`), database tests (`database.yml`), and the hosted database's gated deploy and nightly drift check (`database-deploy.yml`, `database-drift.yml`; see [supabase/README.md](supabase/README.md#deploy-and-drift-check-workflows)) |
+| `.github/workflows/` | CI (`ci.yml`: lint, unit tests with coverage, builds, and the map's integration tests against a local Supabase), database tests (`database.yml`), and the hosted database's gated deploy and nightly drift check (`database-deploy.yml`, `database-drift.yml`; see [supabase/README.md](supabase/README.md#deploy-and-drift-check-workflows)) |
 | `.github/scripts/` | Helpers for those workflows |
 | `documentation/` | Project docs and AI agent context |
 | `pre_development/` | Database schema drafts (historical) |

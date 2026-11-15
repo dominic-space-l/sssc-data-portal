@@ -116,6 +116,8 @@ Each one is `security definer` with an empty `search_path`, and returns a fixed 
 | `supabase db advisors --type security --fail-on error` | Error-level security issues, such as a public table without RLS |
 | Merged migrations unchanged (PRs only) | Editing, deleting, or renaming a migration already on `main`, or adding one whose timestamp sorts before the newest merged one |
 
+The **Map integration** job in [`ci.yml`](../.github/workflows/ci.yml) also builds a local stack from these migrations and `seed.sql`, on every PR. It runs the map backend's integration tests and its masking check against that stack. So a migration that breaks `map_stations` or `map_filter_options`, or loosens the anon role's access, fails there too.
+
 ### Deploy and drift-check workflows
 
 Two more workflows connect to the hosted project (since map `0.10.0`, step S7 of the [Supabase plan](../documentation/map/supabase_plan.md)). Their setup is under [GitHub environments](#github-environments-for-the-database-workflows).

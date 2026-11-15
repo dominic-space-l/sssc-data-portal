@@ -1,4 +1,4 @@
-"""Smoke test: what the map backend's anon key can and can't do on a Supabase project.
+r"""Smoke test: what the map backend's anon key can and can't do on a Supabase project.
 
 Role: checks, against a real Supabase project (local or hosted), the access rules the
 map depends on (supabase_plan.md, S3-S6). With the key the backend is configured with:
@@ -17,13 +17,18 @@ backend's real features route serves with the anon key:
     - every served point is 250-500 m from its station (235-515 m, allowing for rounding)
 The key is never stored, logged, or put in the app's config. Output is only counts,
 pass/fail lines, and the smallest and largest offsets: never coordinates or keys.
+For non-interactive runs (CI), --service-key-stdin reads the key from the first line of
+standard input instead of prompting. It still never goes on the command line.
 
 Usage (from map/backend/):
     uv run python scripts/smoke_supabase.py
     uv run python scripts/smoke_supabase.py --check-coordinates   # prompts for the key
     SUPABASE_URL=https://<ref>.supabase.co SUPABASE_KEY=<anon key> \
         uv run python scripts/smoke_supabase.py
-Exits 0 if every check passes, 1 if any fails, and 2 if Supabase isn't configured.
+    printf '%s\n' "$SERVICE_ROLE_KEY" | \
+        uv run python scripts/smoke_supabase.py --check-coordinates --service-key-stdin
+Exits 0 if every check passes, 1 if any fails, and 2 if Supabase isn't configured or no
+service-role key was given.
 """
 
 from __future__ import annotations
@@ -299,7 +304,33 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help="also compare served points with the true locations (prompts for the "
         "service-role key)",
     )
-    return parser.parse_args(argv)
+    parser.add_argument(
+        "--service-key-stdin",
+        action="store_true",
+        help="with --check-coordinates, read the service-role key from the first line of "
+        "standard input instead of prompting (for CI)",
+    )
+    args = parser.parse_args(argv)
+    if args.service_key_stdin and not args.check_coordinates:
+        parser.error("--service-key-stdin only applies with --check-coordinates")
+    return args
+
+
+def read_service_key(from_stdin: bool) -> str:
+    """Gets the service-role key for the coordinate check, without echoing it.
+
+    Args:
+        from_stdin: Read the first line of standard input instead of prompting.
+
+    Returns:
+        The key, stripped of surrounding whitespace. Empty if none was given.
+
+    Usage:
+        read_service_key(from_stdin=False)   # prompts
+    """
+    if from_stdin:
+        return sys.stdin.readline().strip()
+    return getpass.getpass("Service-role key (used for this check only, not stored): ").strip()
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -309,7 +340,8 @@ def main(argv: list[str] | None = None) -> int:
         argv: Command-line arguments, or None for ``sys.argv``.
 
     Returns:
-        The exit code: 0 all passed, 1 a check failed, 2 not configured.
+        The exit code: 0 all passed, 1 a check failed, 2 not configured or no
+        service-role key given.
 
     Usage:
         sys.exit(main())
@@ -323,12 +355,16 @@ def main(argv: list[str] | None = None) -> int:
     if not config.is_database_configured:
         print("Set SUPABASE_URL and SUPABASE_KEY (or map/backend/.env).", file=sys.stderr)
         return 2
+    # Ask for the key before any checks run, so a missing key fails fast.
+    service_key = read_service_key(args.service_key_stdin) if args.check_coordinates else None
+    if args.check_coordinates and not service_key:
+        print("No service-role key given, so the coordinates can't be checked.", file=sys.stderr)
+        return 2
 
     print(f"Checking {urlsplit(config.supabase_url).hostname} with the configured anon key\n")
     results = run_checks(config)
-    if args.check_coordinates:
-        service_key = getpass.getpass("Service-role key (used for this check only, not stored): ")
-        results += check_coordinates(config, service_key.strip())
+    if service_key:
+        results += check_coordinates(config, service_key)
     for result in results:
         print(f"{'PASS' if result.passed else 'FAIL'}  {result.name}: {result.detail}")
     failed = sum(not result.passed for result in results)

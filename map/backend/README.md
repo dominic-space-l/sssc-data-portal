@@ -97,16 +97,27 @@ It **prompts** for the service-role key (from **Project Settings → API Keys**,
 
 It prints only counts and the smallest and largest offsets.
 
+For non-interactive runs, `--service-key-stdin` reads the key from the first line of standard input instead of prompting. CI uses it with the local stack's throwaway key. The key still never goes on the command line:
+
+```sh
+printf '%s\n' "$SERVICE_ROLE_KEY" | uv run python scripts/smoke_supabase.py --check-coordinates --service-key-stdin
+```
+
+It exits 2 if no key is given, before running any check.
+
 ## Testing
 ```sh
-uv run pytest
+uv run pytest --cov      # unit tests with coverage, as CI runs them (fails under 95%)
+uv run pytest            # the same tests without coverage, e.g. for one file
 uv run ruff check && uv run ruff format --check   # lint and format, as CI runs them
 
 # Integration tests: the real app against a real Supabase project (local or hosted).
 SUPABASE_URL=http://127.0.0.1:54321 SUPABASE_KEY=<anon key> uv run pytest -m integration
 ```
 
-Integration tests (`tests/test_integration.py`, marked `integration`) are deselected by default, and skipped unless `SUPABASE_URL` and `SUPABASE_KEY` are set in the environment. They don't read `.env`. They assume nothing about the data beyond the API contract, so they work against the hosted project too. CI doesn't run them.
+Coverage measures `src/` and `scripts/` with branch coverage (`[tool.coverage]` in `pyproject.toml`). Tests import the smoke script as `smoke_supabase`, because pytest's `pythonpath` includes `scripts/`.
+
+Integration tests (`tests/test_integration.py`, marked `integration`) are deselected by default, and skipped unless `SUPABASE_URL` and `SUPABASE_KEY` are set in the environment. They don't read `.env`. They assume nothing about the data beyond the API contract, so they work against the hosted project too. CI runs them, and the smoke script with `--check-coordinates`, against a local stack in the **Map integration** job of `.github/workflows/ci.yml`.
 
 Tests never read your `.env` or environment: fixtures in `tests/conftest.py` build the app with an explicit `Config`, and the tests of environment loading use a temporary `.env` and restore the environment afterwards.
 
@@ -130,4 +141,6 @@ Tests never read your `.env` or environment: fixtures in `tests/conftest.py` bui
 | `tests/conftest.py` | Shared fixtures: `app` and `client` with no Supabase configured, and `clean_env` |
 | `tests/fakes.py` | `FakeDatabase` (canned rpc results) and `FakeLayer` (one filter of each type) |
 | `tests/test_integration.py` | Integration tests against a real Supabase project (`-m integration`) |
+| `tests/test_smoke_supabase.py` | The smoke script's checks, exit codes, and output safety, with fake Supabase clients |
+| `tests/test_main.py` | The dev-server entry point, and that `PORT` matches the frontend's proxy |
 | `tests/` | pytest tests |

@@ -2,10 +2,16 @@
 #
 # Role: runs on pushes to main and on every pull request. Each job mirrors an npm script
 # from the root package.json, so any failure can be reproduced locally with the same command.
+# The unit test steps also enforce coverage: the map frontend's thresholds are in
+# map/frontend/angular.json, and the backend's (95%) in map/backend/pyproject.toml.
+# The integration job runs the map backend against a local Supabase stack built from
+# supabase/migrations and seed.sql. It needs no secrets and never touches the hosted project.
 #
 # Usage (local equivalents, from the repo root):
 #   npm run lint && npm run format:check && npm test && npm run build   # frontend job
 #   npm run lint:backend && npm run test:backend                        # backend job
+#   npm run db:start && npm run test:backend:integration                # integration job
+#     (with SUPABASE_URL and SUPABASE_KEY from `npx supabase status -o env`; see map/README.md)
 
 name: CI
 
@@ -75,5 +81,79 @@ jobs:
       - name: Check formatting (Ruff)
         run: uv run ruff format --check
 
-      - name: Test (pytest)
-        run: uv run pytest
+      - name: Test (pytest, with coverage)
+        run: uv run pytest --cov
+
+  integration:
+    name: Map integration (local Supabase)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Use pinned npm version
+        run: npm install -g npm@11.19.0
+
+      # Installs the Supabase CLI at the version pinned in package-lock.json.
+      - name: Install dependencies
+        run: npm ci
+
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+          cache-dependency-glob: map/backend/uv.lock
+
+      - name: Install backend dependencies
+        working-directory: map/backend
+        run: uv sync --locked
+
+      # Only what the backend calls: Postgres, PostgREST, and the API gateway. Starting
+      # applies every migration and seed.sql, which creates a throwaway masking secret.
+      - name: Start local Supabase
+        run: >-
+          npx supabase start
+          --exclude gotrue,realtime,storage-api,imgproxy,studio,postgres-meta,edge-runtime,logflare,vector
+
+      # These are the local stack's own keys, not secrets, but they're masked anyway.
+      # The anon key goes to every later step, like the backend's real config. The
+      # service-role key goes only to the coordinate check, through standard input.
+      - name: Read the local API URL and keys
+        id: local
+        run: |
+          set -euo pipefail
+          status=$(npx supabase status -o json)
+          url=$(jq -r '.API_URL // empty' <<<"$status")
+          anon=$(jq -r '.ANON_KEY // .PUBLISHABLE_KEY // empty' <<<"$status")
+          service=$(jq -r '.SERVICE_ROLE_KEY // .SECRET_KEY // empty' <<<"$status")
+          if [ -z "$url" ] || [ -z "$anon" ] || [ -z "$service" ]; then
+            echo "::error::supabase status didn't report the API URL, anon key, and service-role key."
+            exit 1
+          fi
+          echo "::add-mask::$anon"
+          echo "::add-mask::$service"
+          {
+            echo "SUPABASE_URL=$url"
+            echo "SUPABASE_KEY=$anon"
+          } >> "$GITHUB_ENV"
+          echo "service_key=$service" >> "$GITHUB_OUTPUT"
+
+      # The settings are checked non-empty above, so these tests can't silently skip.
+      - name: Integration tests (pytest)
+        working-directory: map/backend
+        run: uv run pytest -m integration -rs
+
+      - name: Access and masking checks (smoke script)
+        working-directory: map/backend
+        env:
+          SERVICE_ROLE_KEY: ${{ steps.local.outputs.service_key }}
+        run: >-
+          printf '%s\n' "$SERVICE_ROLE_KEY" |
+          uv run python scripts/smoke_supabase.py --check-coordinates --service-key-stdin
+
+      - name: Stop local Supabase
+        if: always()
+        run: npx supabase stop --no-backup

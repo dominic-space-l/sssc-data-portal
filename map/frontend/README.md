@@ -22,13 +22,18 @@ You don't need the Angular CLI installed globally. Run it through npm from the r
 ```sh
 npm run ng -w map-frontend -- generate component component-name
 npm run build -w map-frontend    # production build into dist/
-npm test -w map-frontend         # Vitest unit tests
+npm test -w map-frontend         # Vitest unit tests, with coverage thresholds
 ```
+
+## Testing
+`npm test -w map-frontend` runs every spec (`src/**/*.spec.ts`) in jsdom, with coverage. The thresholds are under `coverageThresholds` in `angular.json` (statements 99%, branches 95%, functions 98%, lines 99%), and the run fails if coverage drops below them. Every `.ts` file under `src/` counts except the specs and `main.ts`. A file no spec loads counts as uncovered. To run without coverage, for example while working on one spec, add `--coverage=false`.
+
+jsdom doesn't lay anything out, so elements have no size. Specs that need a sized map stub `clientWidth` and `clientHeight` (see "MapView fitting the view" in `src/app/map/map.spec.ts`).
 
 ## Directory Guide
 | Path | Contents |
 | --- | --- |
-| `angular.json` | Angular CLI build, serve, and test configuration |
+| `angular.json` | Angular CLI build, serve, and test configuration, including the coverage thresholds |
 | `package.json` | This app's dependencies (installed from the repo root) |
 | `public/` | Static assets copied as-is into the build |
 | `src/main.ts` | Browser entry point |
