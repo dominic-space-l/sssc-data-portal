@@ -18,6 +18,6 @@ None. Everything here is Markdown.
 | `CLAUDECODE/` | Rules (`CLAUDE.md`) and per-section context files for AI coding agents |
 | `map/` | Map changelog and plans, the API contract (`api.md`), and the guide to adding or changing a layer (`adding_a_layer.md`) |
 | `portal/` | Portal changelog and plans |
-| `authentication/` | Authentication changelog and plans |
+| `authentication/` | Authentication changelog, and the assessment of its Supabase use against the map's (`supabase_assessment.md`) |
 
 Each code section (`map/`, `portal/`, `authentication/`) keeps its `CHANGELOG.md` here, with versions in the form `xx.yy.zz` (see `CLAUDECODE/CLAUDE.md`). The database schema is in [`schema.md`](schema.md).
