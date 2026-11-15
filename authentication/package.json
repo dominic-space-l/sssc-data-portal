@@ -1,0 +1,24 @@
+{
+  "name": "data-portal",
+  "version": "1.0.0",
+  "description": "- `prototype/` bare-bones test pages (Dominic) - `auth/` auth.js: the functions the website's buttons call (Dominic) - `supabase/functions/` Edge Functions (Dominic) - `ui/` the real website (partner)",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/dominic-space-l/sssc-data-portal.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/dominic-space-l/sssc-data-portal/issues"
+  },
+  "homepage": "https://github.com/dominic-space-l/sssc-data-portal#readme",
+  "devDependencies": {
+    "supabase": "^2.121.0"
+  }
+}
