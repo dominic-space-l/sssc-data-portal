@@ -4,7 +4,7 @@
 // Steps: check the bot test -> check the fields -> save to private.access_requests -> email the admin.
 // Secrets used: TURNSTILE_SECRET_KEY, RESEND_API_KEY, NOTIFY_EMAIL, SITE_URL
 
-import { json, preflight, readJson, requireEnv, siteUrl } from "../_shared/http.ts";
+import { adminPageUrl, json, preflight, readJson, requireEnv } from "../_shared/http.ts";
 import { db } from "../_shared/db.ts";
 import { escapeHtml, sendAlert } from "../_shared/email.ts";
 
@@ -39,6 +39,8 @@ Deno.serve(async (req) => {
     const email = text(body.email, 320).toLowerCase();
     const reason = text(body.reason, 2000);
     const token = text(body.turnstileToken, 4096);
+    // "new": add new data. "edit": update data the organization already has.
+    const kind = body.kind === "edit" ? "edit" : "new";
 
     const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? null;
     if (!(await passedBotCheck(token, ip))) {
@@ -61,14 +63,15 @@ Deno.serve(async (req) => {
     }
 
     await sql`
-      insert into private.access_requests (org_name, contact_name, email, reason)
-      values (${orgName}, ${contactName || null}, ${email}, ${reason || null})`;
+      insert into private.access_requests (org_name, contact_name, email, reason, kind)
+      values (${orgName}, ${contactName || null}, ${email}, ${reason || null}, ${kind})`;
 
-    const dashboard = `${siteUrl()}/admin.html`;
+    const dashboard = adminPageUrl();
     await sendAlert(
-      `New access request: ${orgName}`,
+      `New access request: ${orgName}${kind === "edit" ? " (update existing data)" : ""}`,
       `<p>A new access request is waiting for review.</p>
-       <p><strong>Organization:</strong> ${escapeHtml(orgName)}</p>
+       <p><strong>Organization:</strong> ${escapeHtml(orgName)}<br/>
+          <strong>Wants to:</strong> ${kind === "edit" ? "update data it already has" : "add new data"}</p>
        <p><a href="${dashboard}">Open the admin dashboard</a> to approve or reject it.</p>`,
     );
 

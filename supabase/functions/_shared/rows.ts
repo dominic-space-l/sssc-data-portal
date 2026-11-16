@@ -111,7 +111,7 @@ async function writableKeys(sql: Sql, table: string, rows: Row[]): Promise<strin
   return keys;
 }
 
-async function primaryKey(sql: Sql, table: string): Promise<string> {
+export async function primaryKey(sql: Sql, table: string): Promise<string> {
   const quoted = `public."${table.replaceAll('"', '""')}"`;
   const cols = await sql`
     select a.attname as name
@@ -167,7 +167,7 @@ export async function insertParts(sql: Sql, parts: Part[]): Promise<number> {
   return saved;
 }
 
-class Rollback extends Error {}
+export class Rollback extends Error {}
 
 /** Tries the whole save and then undoes it. Returns an error message, or null if it would work. */
 export async function dryRun(sql: Sql, parts: Part[]): Promise<string | null> {

@@ -1,0 +1,18 @@
+<header class="topbar">
+  <a routerLink="/" class="brand">SSSC Data Portal</a>
+  <nav>
+    @if (api.user(); as user) {
+      <a routerLink="/forms" routerLinkActive="active">Add data</a>
+      <a routerLink="/admin" routerLinkActive="active">Dashboard</a>
+      <span class="muted who">{{ user.email }}</span>
+      <button type="button" class="link" (click)="logout()">Log out</button>
+    } @else {
+      <a routerLink="/request-access" routerLinkActive="active">Request access</a>
+      <a routerLink="/login" routerLinkActive="active">Admin login</a>
+    }
+  </nav>
+</header>
+
+<main>
+  <router-outlet />
+</main>

@@ -39,3 +39,15 @@ export function requireEnv(name: string): string {
 export function siteUrl(): string {
   return requireEnv("SITE_URL").replace(/\/+$/, "");
 }
+
+/**
+ * Page addresses inside the website. The plain prototype uses /admin.html and /submit.html;
+ * the Angular site uses /admin and /submit. Set ADMIN_PATH and SUBMIT_PATH secrets to switch.
+ */
+export function adminPageUrl(): string {
+  return siteUrl() + (Deno.env.get("ADMIN_PATH") ?? "/admin.html");
+}
+
+export function submitPageUrl(code: string): string {
+  return `${siteUrl()}${Deno.env.get("SUBMIT_PATH") ?? "/submit.html"}?code=${code}`;
+}

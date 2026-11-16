@@ -1,0 +1,135 @@
+<div class="row-between">
+  <h1>Dashboard</h1>
+  <button type="button" class="secondary" (click)="refresh()">Refresh</button>
+</div>
+
+@if (error()) { <p class="error">{{ error() }}</p> }
+@if (notice()) { <p class="success">{{ notice() }}</p> }
+
+@for (l of links(); track l.link) {
+  <div class="link-box">
+    <strong>{{ l.kind === 'edit' ? 'Update link' : 'Link' }} for {{ l.orgName ?? 'organization' }}</strong>
+    @if (l.email) { <span class="muted"> ({{ l.email }})</span> }
+    <code>{{ l.link }}</code>
+    <div class="actions">
+      <button type="button" (click)="copy(l.link)">Copy link</button>
+      <a class="button secondary" [href]="mailto(l)">Email it</a>
+      <button type="button" class="secondary" (click)="dismiss(l)">Done</button>
+    </div>
+  </div>
+}
+
+<section class="create-link">
+  <h2>Create an update link</h2>
+  <p class="muted">For an organization that asked (e.g. by email) to update its stations, contacts, devices or sensors.
+    The link works until it expires, and you approve every change.</p>
+  <div class="actions">
+    <select aria-label="Organization" (change)="newLinkOrgId.set($any($event.target).value)">
+      <option value="" [selected]="!newLinkOrgId()">Choose organization…</option>
+      @for (o of organizations(); track o.id) { <option [value]="o.id" [selected]="newLinkOrgId() === '' + o.id">{{ o.name }}</option> }
+    </select>
+    <button type="button" [disabled]="busyId() === 'create-link' || !newLinkOrgId()" (click)="createEditLink(newLinkOrgId())">Create update link</button>
+  </div>
+</section>
+
+<section>
+  <h2>Access requests</h2>
+  @if (requests() === null) {
+    <p class="muted">Loading…</p>
+  } @else if (requests()!.length === 0) {
+    <p class="muted">No requests waiting.</p>
+  } @else {
+    @for (r of requests(); track r.id) {
+      <article class="item">
+        <div>
+          <strong>{{ r.org_name }}</strong>
+          @if (r.kind === 'edit') { <span class="badge">wants to update existing data</span> }
+          <span class="muted"> · {{ r.contact_name || 'no name' }} · {{ r.email }} · {{ when(r.created_at) }}</span>
+          @if (r.reason) { <p>{{ r.reason }}</p> }
+        </div>
+        <div class="actions">
+          <select [attr.aria-label]="'Link type for ' + r.org_name" [value]="linkChoice(r)" (change)="choose(r, $any($event.target).value)">
+            <option value="">New data link (works once)</option>
+            @for (o of organizations(); track o.id) {
+              <option [value]="o.id" [selected]="linkChoice(r) === '' + o.id">Update link for: {{ o.name }}</option>
+            }
+          </select>
+          <button type="button" [disabled]="busyId() === r.id" (click)="approveRequest(r)">Approve</button>
+          <button type="button" class="danger" [disabled]="busyId() === r.id" (click)="rejectRequest(r)">Reject</button>
+        </div>
+      </article>
+    }
+  }
+</section>
+
+<section>
+  <h2>Submissions to review</h2>
+  @if (submissions() === null) {
+    <p class="muted">Loading…</p>
+  } @else if (submissions()!.length === 0) {
+    <p class="muted">No submissions waiting.</p>
+  } @else {
+    @for (s of submissions(); track s.id) {
+      <article class="item column">
+        <div>
+          <strong>{{ s.org_name ?? 'Unknown organization' }}</strong>
+          @if (s.kind === 'edit') { <span class="badge">edit</span> }
+          <span class="muted">
+            @if (s.kind === 'edit') {
+              · {{ s.row_count }} change{{ s.row_count === 1 ? '' : 's' }} · {{ when(s.submitted_at) }}
+            } @else {
+              · {{ s.form ? s.form + ' form' : 'data' }} · {{ s.row_count }} rows · {{ when(s.submitted_at) }}
+            }
+            @if (s.email) { · {{ s.email }} }
+          </span>
+        </div>
+
+        @for (c of s.changes ?? []; track $index) {
+          <div class="preview">
+            <div><strong>{{ c.label }}</strong>
+              @if (c.op === 'delete') { <span class="badge danger">remove</span> }
+              @if (c.op === 'insert') { <span class="badge">add</span> }
+            </div>
+            @if (c.op === 'update') {
+              <div class="table-wrap">
+                <table class="diff">
+                  <thead><tr><th>Field</th><th>Now</th><th>Change to</th></tr></thead>
+                  <tbody>
+                    @for (f of changedFields(c); track f) {
+                      <tr><td>{{ f }}</td><td class="was">{{ diffCell(c.before?.[f]) }}</td><td class="now">{{ diffCell(c.after?.[f]) }}</td></tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            }
+            @if (c.op === 'insert' && c.table === 'Contacts') {
+              <p class="muted">{{ cell(c.row?.['FirstName']) }} {{ cell(c.row?.['LastName']) }} · {{ cell(c.row?.['Email']) }}</p>
+            }
+          </div>
+        }
+
+        @for (part of s.parts; track $index) {
+          <div class="preview">
+            <div class="muted">{{ part.table }} ({{ part.rows.length }})</div>
+            <div class="table-wrap">
+              <table>
+                <thead><tr>@for (c of columns(part); track c) { <th>{{ c }}</th> }</tr></thead>
+                <tbody>
+                  @for (row of part.rows; track $index) {
+                    <tr>@for (c of columns(part); track c) { <td>{{ cell($any(row)[c]) }}</td> }</tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          </div>
+        }
+
+        <div class="actions">
+          <button type="button" [disabled]="busyId() === s.id" (click)="approveSubmission(s)">{{ s.kind === 'edit' ? 'Approve changes' : 'Approve and save' }}</button>
+          <button type="button" class="danger" [disabled]="busyId() === s.id" (click)="rejectSubmission(s, false)">Reject</button>
+          <button type="button" class="secondary" [disabled]="busyId() === s.id" (click)="rejectSubmission(s, true)">Reject + new link</button>
+        </div>
+      </article>
+    }
+  }
+</section>

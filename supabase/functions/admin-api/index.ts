@@ -3,12 +3,18 @@
 //
 // Actions (send { "action": "...", ... } in the body):
 //   list_requests                          -> pending access requests
-//   approve_request    { id }              -> marks approved, creates a one-time link, returns it
+//   approve_request    { id, organizationId? } -> marks approved, creates a link, returns it.
+//                                             With organizationId: an UPDATE link for that organization
+//                                             (required when the request asked to update existing data)
+//   create_edit_link   { organizationId }  -> an update link without a request (e.g. the organization emailed)
 //   reject_request     { id }              -> marks rejected
 //   list_submissions                       -> outside submissions waiting for review
-//   approve_submission { id }              -> saves every part into the real tables (all or none)
+//   approve_submission { id }              -> new data: saves every part (all or none)
+//                                             edit: applies the changes, unless the data changed meanwhile
 //   reject_submission  { id, newLink }     -> discards it; newLink: true also creates a fresh link
 //   submit_direct      { parts }           -> the admin's own multi-table entry, saved straight away (all or none)
+//   form_options                           -> dropdown lists for the forms
+//   submit_form        { form, fields }    -> the admin fills in a form: checked, built, saved straight away
 //
 // Secrets used: SITE_URL, ALLOWED_TABLES, LINK_DAYS (optional, default 7)
 
@@ -17,11 +23,26 @@ import { db } from "../_shared/db.ts";
 import { getCaller } from "../_shared/auth.ts";
 import { createLink } from "../_shared/links.ts";
 import { friendlyDbError, insertParts, normalizeParts, RowError } from "../_shared/rows.ts";
+import { buildForm, FieldError, formOptions } from "../_shared/forms.ts";
+import { applyChanges, EditConflict, readChanges } from "../_shared/edits.ts";
+
+const orgIdOrNull = (v: unknown) => {
+  const n = Number(v);
+  return v !== null && v !== undefined && v !== "" && Number.isInteger(n) && n > 0 ? n : null;
+};
+
+// deno-lint-ignore no-explicit-any
+async function organizationName(sql: any, id: number | null): Promise<string | null> {
+  if (id === null) return null;
+  const [org] = await sql`select "OrganizationName" as name from "Organizations" where "OrganizationID" = ${id}`;
+  return org ? org.name : null;
+}
 
 const isUuid = (v: unknown): v is string =>
   typeof v === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
 
 class Conflict extends Error {}
+class NeedsOrg extends Error {}
 
 Deno.serve(async (req) => {
   const early = preflight(req);
@@ -42,7 +63,7 @@ Deno.serve(async (req) => {
       // ---------------- Access requests (Day 3) ----------------
       case "list_requests": {
         const requests = await sql`
-          select id, org_name, contact_name, email, reason, created_at
+          select id, org_name, contact_name, email, reason, created_at, kind
           from private.access_requests
           where status = 'pending'
           order by created_at`;
@@ -50,31 +71,51 @@ Deno.serve(async (req) => {
       }
 
       case "approve_request": {
+        const organizationId = orgIdOrNull(body.organizationId);
+        const orgName = await organizationName(sql, organizationId);
+        if (organizationId !== null && !orgName) return json({ ok: false, message: "That organization doesn't exist." }, 400);
         const result = await sql.begin(async (tx: typeof sql) => {
           const [request] = await tx`
             update private.access_requests
             set status = 'approved', reviewed_at = now()
-            where id = ${body.id} and status = 'pending'
-            returning id, org_name, email`;
-          if (!request) return null;
-          const link = await createLink(tx, request.id);
+            where id = ${body.id as string} and status = 'pending'
+            returning id, org_name, email, kind`;
+          if (!request) return { error: "That request was already handled.", status: 409 };
+          if (request.kind === "edit" && organizationId === null) {
+            throw new NeedsOrg();
+          }
+          const link = organizationId === null
+            ? await createLink(tx, request.id)
+            : await createLink(tx, request.id, { kind: "edit", organizationId });
           return { request, ...link };
+        }).catch((err: unknown) => {
+          if (err instanceof NeedsOrg) return { error: "This organization wants to update existing data. Pick which organization it is first.", status: 400 };
+          throw err;
         });
-        if (!result) return json({ ok: false, message: "That request was already handled." }, 409);
+        if ("error" in result) return json({ ok: false, message: result.error }, result.status);
         return json({
           ok: true,
           email: result.request.email,
-          orgName: result.request.org_name,
+          orgName: orgName ?? result.request.org_name,
+          kind: result.kind,
           link: result.link,
           expiresAt: result.expiresAt,
         });
+      }
+
+      case "create_edit_link": {
+        const organizationId = orgIdOrNull(body.organizationId);
+        const orgName = await organizationName(sql, organizationId);
+        if (!orgName) return json({ ok: false, message: "Pick an organization." }, 400);
+        const link = await createLink(sql, null, { kind: "edit", organizationId });
+        return json({ ok: true, email: null, orgName, ...link });
       }
 
       case "reject_request": {
         const [request] = await sql`
           update private.access_requests
           set status = 'rejected', reviewed_at = now()
-          where id = ${body.id} and status = 'pending'
+          where id = ${body.id as string} and status = 'pending'
           returning id, email, org_name`;
         if (!request) return json({ ok: false, message: "That request was already handled." }, 409);
         return json({ ok: true, email: request.email, orgName: request.org_name });
@@ -83,11 +124,12 @@ Deno.serve(async (req) => {
       // ---------------- Outside submissions (Day 4) ----------------
       case "list_submissions": {
         const submissions = await sql`
-          select s.id, s.parts, s.row_count, s.submitted_at,
-                 r.org_name, r.contact_name, r.email
+          select s.id, s.parts, s.row_count, s.submitted_at, s.form, s.kind, s.changes,
+                 coalesce(o."OrganizationName", r.org_name) as org_name, r.contact_name, r.email
           from private.pending_submissions s
           left join private.access_links l on l.id = s.link_id
           left join private.access_requests r on r.id = l.request_id
+          left join public."Organizations" o on o."OrganizationID" = l.organization_id
           where s.status = 'pending'
           order by s.submitted_at`;
         return json({ ok: true, submissions });
@@ -97,13 +139,20 @@ Deno.serve(async (req) => {
         try {
           const saved = await sql.begin(async (tx: typeof sql) => {
             const [submission] = await tx`
-              select id, parts from private.pending_submissions
-              where id = ${body.id} and status = 'pending'
+              select id, parts, form, kind, changes from private.pending_submissions
+              where id = ${body.id as string} and status = 'pending'
               for update`;
             if (!submission) throw new Conflict();
-            // Re-check against today's ALLOWED_TABLES, then save every part in order.
-            const parts = normalizeParts({ parts: submission.parts });
-            const count = await insertParts(tx, parts);
+            let count: number;
+            if (submission.kind === "edit") {
+              // Edits: apply each change, stopping if the data changed since it was sent.
+              count = await applyChanges(tx, readChanges(submission.changes));
+            } else {
+              // Form submissions were built by trusted server code; raw ones are re-checked
+              // against today's ALLOWED_TABLES. Then every part is saved in order.
+              const parts = normalizeParts({ parts: submission.parts }, { anyTable: !!submission.form });
+              count = await insertParts(tx, parts);
+            }
             await tx`
               update private.pending_submissions
               set status = 'approved', reviewed_at = now()
@@ -113,6 +162,7 @@ Deno.serve(async (req) => {
           return json({ ok: true, saved });
         } catch (err) {
           if (err instanceof Conflict) return json({ ok: false, message: "That submission was already handled." }, 409);
+          if (err instanceof EditConflict) return json({ ok: false, message: err.message }, 409);
           if (err instanceof RowError) return json({ ok: false, message: err.message }, 400);
           return json({ ok: false, message: friendlyDbError(err) }, 400);
         }
@@ -123,15 +173,23 @@ Deno.serve(async (req) => {
           const [submission] = await tx`
             update private.pending_submissions
             set status = 'rejected', reviewed_at = now(), review_note = ${body.newLink ? "rejected, new link sent" : "rejected"}
-            where id = ${body.id} and status = 'pending'
+            where id = ${body.id as string} and status = 'pending'
             returning link_id`;
           if (!submission) return null;
           const [request] = await tx`
-            select r.id, r.email, r.org_name
+            select r.id, r.email, coalesce(o."OrganizationName", r.org_name) as org_name,
+                   l.kind, l.organization_id
             from private.access_links l
-            join private.access_requests r on r.id = l.request_id
+            left join private.access_requests r on r.id = l.request_id
+            left join public."Organizations" o on o."OrganizationID" = l.organization_id
             where l.id = ${submission.link_id}`;
-          const fresh = body.newLink ? await createLink(tx, request?.id ?? null) : null;
+          // The new link is the same kind as the old one (an update link stays an update link).
+          const fresh = body.newLink
+            ? await createLink(tx, request?.id ?? null, {
+              kind: request?.kind === "edit" ? "edit" : "new",
+              organizationId: request?.organization_id === null || request?.organization_id === undefined ? null : Number(request.organization_id),
+            })
+            : null;
           return { email: request?.email ?? null, orgName: request?.org_name ?? null, ...(fresh ?? {}) };
         });
         if (!result) return json({ ok: false, message: "That submission was already handled." }, 409);
@@ -145,6 +203,21 @@ Deno.serve(async (req) => {
           const saved = await sql.begin((tx: typeof sql) => insertParts(tx, parts));
           return json({ ok: true, saved });
         } catch (err) {
+          if (err instanceof RowError) return json({ ok: false, message: err.message }, 400);
+          return json({ ok: false, message: friendlyDbError(err) }, 400);
+        }
+      }
+
+      case "form_options":
+        return json({ ok: true, options: await formOptions(sql) });
+
+      case "submit_form": {
+        try {
+          const parts = normalizeParts({ parts: await buildForm(sql, body.form, body.fields) }, { anyTable: true });
+          const saved = await sql.begin((tx: typeof sql) => insertParts(tx, parts));
+          return json({ ok: true, saved });
+        } catch (err) {
+          if (err instanceof FieldError) return json({ ok: false, field: err.field, message: err.message }, 400);
           if (err instanceof RowError) return json({ ok: false, message: err.message }, 400);
           return json({ ok: false, message: friendlyDbError(err) }, 400);
         }
