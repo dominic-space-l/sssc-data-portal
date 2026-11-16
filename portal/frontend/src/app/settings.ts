@@ -12,7 +12,7 @@ export const SETTINGS = {
   /** API_URL from `npx supabase status -o env`, or a hosted project's URL. */
   supabaseUrl: 'https://hehharhdxezekqongisc.supabase.co',
   /** PUBLISHABLE_KEY (starts with sb_publishable_) from `npx supabase status -o env`. */
-  supabasePublishableKey: 'sb_publishable_ACJWlzQHlZjBrEguHvfOxg_3BJgxAaH',
+  supabasePublishableKey: 'sb_publishable_UycXMxK1xdrMYxW6X533_A_-AJVWIX8',
   /** Cloudflare's test site key (the bot check always passes). Swap in SSSC's real key before launch. */
   turnstileSiteKey: '1x00000000000000000000AA',
   /** Shown to outside organizations as "Questions? Contact ...". The client's admin email. */
