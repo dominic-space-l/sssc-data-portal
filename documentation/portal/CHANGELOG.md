@@ -3,6 +3,21 @@
 Versioning follows `xx.yy.zz` (see [documentation/CLAUDECODE/CLAUDE.md](../CLAUDECODE/CLAUDE.md)):
 `xx` = major feature, `yy` = steps/commits toward a major feature, `zz` = small updates and revisions.
 
+## 0.3.0 — 2026-11-16
+
+The portal's first real pages, connected to authentication (authentication 0.3.0), styled with the SSSC Brand & Style Guide.
+- **Pages:** home, admin login, request access (with an "add new / update existing" choice), the link page (single form for new-data links; "Update existing" + "Add new" tabs for update links), admin data entry (`/forms` menu: Enter information, New project, New organization, New station, New device), admin dashboard (requests, submissions with previews, edits as before/after, "Create update link"), and the Claude connect page (`/oauth/consent`).
+- **Forms:** one `DataForm` component draws every form from `form-definitions.ts`. The server checks every field; its error is shown under the field.
+- **Style guide:** palette colors as CSS variables, Museo/Museo Sans/Museo Sans Condensed font stacks with system fallbacks (no font files: they're licensed), a text wordmark until SSSC provides an official logo file, the land acknowledgment in the footer, no photos.
+- **Settings:** `src/app/settings.ts` defaults to the local Supabase stack. Only public values go there.
+- **Dependencies:** `@supabase/supabase-js`. The initial bundle warning budget is now 750kB.
+- **Tests:** the shell (name, menu, land acknowledgment) and the form definitions (unique keys, real dropdown lists, the single form's required fields match the server's).
+
+**Files changed**
+- `portal/frontend/src/` (app shell, `forms/`, `guards/`, `pages/`, `services/`, `settings.ts`, `styles.scss`, `index.html`)
+- `portal/frontend/package.json`, `portal/frontend/angular.json`, `package-lock.json`
+- `documentation/portal/CHANGELOG.md`
+
 ## 0.2.3 — 2026-11-12
 
 Added [documentation/deployment_guide.md](../deployment_guide.md) for portal and authentication developers. It covers:

@@ -8,7 +8,7 @@
 # job summary:
 #   1. Migration history: every migration is both in the repo and on the hosted database.
 #   2. Schema: builds the migrations in a shadow database on the runner (Docker) and
-#      diffs it against the hosted public and map_private schemas. Any SQL fails.
+#      diffs it against the hosted public, map_private and auth_private schemas. Any SQL fails.
 #   3. Security advisors: any ERROR-level finding (for example a table without RLS).
 # It connects only as ci_drift_check, a role that can read the catalog and the migration
 # history but no table data, and it never writes. No Supabase access token is needed.
@@ -83,7 +83,7 @@ jobs:
           SUPABASE_READONLY_DB_URL: ${{ secrets.SUPABASE_READONLY_DB_URL }}
         run: |
           npx supabase db diff --from migrations --to "$SUPABASE_READONLY_DB_URL" \
-            --schema public,map_private --output-format json | tee diff.json
+            --schema public,map_private,auth_private --output-format json | tee diff.json
           node .github/scripts/supabase_ci.mjs diff diff.json
 
       - name: Security advisors

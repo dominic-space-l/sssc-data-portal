@@ -1,4 +1,5 @@
-// Confirms the caller is a logged-in user. Sign-ups are off, so a logged-in user is the admin.
+// Confirms the caller is a signed-in ADMIN: a valid Supabase Auth user who is also listed in
+// auth_private.admins. Being signed in alone is not enough.
 
 import { requireEnv } from "./http.ts";
 
@@ -13,7 +14,7 @@ function publicApiKey(): string {
   throw new Error("No public API key available to the function");
 }
 
-/** Returns { id, email } for the logged-in caller, or null. */
+/** Returns { id, email } for the signed-in caller, or null. Doesn't check the admin list. */
 export async function getCaller(req: Request): Promise<{ id: string; email: string } | null> {
   const header = req.headers.get("Authorization") ?? "";
   const token = header.replace(/^Bearer\s+/i, "");
@@ -25,4 +26,16 @@ export async function getCaller(req: Request): Promise<{ id: string; email: stri
   if (!res.ok) return null;
   const user = await res.json();
   return user?.id ? { id: user.id, email: user.email } : null;
+}
+
+
+// deno-lint-ignore no-explicit-any
+type Sql = any;
+
+/** Returns { id, email } when the caller is signed in AND listed in auth_private.admins, else null. */
+export async function getAdmin(req: Request, sql: Sql): Promise<{ id: string; email: string } | null> {
+  const caller = await getCaller(req);
+  if (!caller) return null;
+  const [row] = await sql`select 1 as ok from auth_private.admins where user_id = ${caller.id}`;
+  return row ? caller : null;
 }

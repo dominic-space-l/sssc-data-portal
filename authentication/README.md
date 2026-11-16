@@ -7,7 +7,27 @@ The authentication system controls who can write data into the monitoring databa
 - **The admin (SSSC staff)** signs in with an email and password. The admin can enter data directly and reviews everything that comes from outside.
 - **Outside organizations** never get an account. They ask for access, and if the admin approves, they get a **one-time link** that lets them submit data once. Nothing they submit reaches the real tables until the admin approves it.
 
-**Status: prototype** (authentication `0.2.x`). The pages in `prototype/` are bare-bones test pages for the flows. The real interface will be built into the portal. The prototype runs against a **separate Supabase test project**, not the repo's database in [`supabase/`](../supabase/). Its schema changes are SQL scripts run by hand, not migrations. Bringing it into the shared database is covered in [documentation/authentication/supabase_assessment.md](../documentation/authentication/supabase_assessment.md). Changes are logged in the [authentication changelog](../documentation/authentication/CHANGELOG.md).
+**Status: on the shared database** (authentication `0.3.0`), following [documentation/authentication/supabase_assessment.md](../documentation/authentication/supabase_assessment.md). Changes are logged in the [authentication changelog](../documentation/authentication/CHANGELOG.md).
+
+| Piece | Where it lives now |
+| --- | --- |
+| Tables (`auth_private`: admins, access requests, links, pending submissions), `auth_private.is_admin()`, admin read policies | `supabase/migrations/2026111622*_auth_*.sql`, tests in `supabase/tests/07_*`, `08_*` |
+| Edge Functions (`request-access`, `submit-external`, `admin-api`, `mcp`) | `supabase/functions/`, with `verify_jwt` set in `supabase/config.toml` |
+| Pages (login, request access, link page with update tab, dashboard, data entry, Claude connect) | `portal/frontend/` |
+| Old prototype pages (`prototype/`, `auth/auth.js`) | Still here for reference. They call actions that no longer exist (`lookup`, raw `submit`, `submit_direct`), so they don't work against the new functions. |
+
+**Who is an admin:** a user created under **Authentication → Users** who is also listed in `auth_private.admins`. Signing in alone gives nothing. Add one in the SQL editor:
+
+```sql
+insert into auth_private.admins (user_id, note)
+select id, 'portal admin' from auth.users where email = '<their email>';
+```
+
+**Running the functions locally:** `npm run db:start`, then `npx supabase functions serve --env-file supabase/functions/.env` (a git-ignored file with `SITE_URL=http://localhost:4201`, `RESEND_API_KEY`, `NOTIFY_EMAIL` and `TURNSTILE_SECRET_KEY`; Cloudflare's test secret is `1x0000000000000000000000000000000AA`). Put the local `PUBLISHABLE_KEY` from `npx supabase status -o env` in `portal/frontend/src/app/settings.ts`.
+
+**Hosted project, by hand:** deploy with `npx supabase functions deploy <name>` and set the secrets above with `npx supabase secrets set`. Optional secrets: `LINK_DAYS` (default 7), `LINK_FORMS` (forms open to links, default `main`), `ADMIN_PATH`/`SUBMIT_PATH` (default `/admin`, `/submit`). In the dashboard: sign-ups off, `auth_private` **not** in Exposed schemas, and (for the MCP connector) the OAuth server on with Authorization Path `/oauth/consent`.
+
+The sections below describe the original prototype and are kept for history.
 
 ### The flows
 

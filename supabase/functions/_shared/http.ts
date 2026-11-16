@@ -39,3 +39,12 @@ export function requireEnv(name: string): string {
 export function siteUrl(): string {
   return requireEnv("SITE_URL").replace(/\/+$/, "");
 }
+
+/** Page addresses inside the portal (portal/frontend routes). */
+export function adminPageUrl(): string {
+  return siteUrl() + (Deno.env.get("ADMIN_PATH") ?? "/admin");
+}
+
+export function submitPageUrl(code: string): string {
+  return `${siteUrl()}${Deno.env.get("SUBMIT_PATH") ?? "/submit"}?code=${code}`;
+}

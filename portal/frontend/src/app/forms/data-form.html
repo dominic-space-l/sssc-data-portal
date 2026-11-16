@@ -1,0 +1,125 @@
+<form class="data-form" (submit)="submit($event)" novalidate>
+  @if (!compact()) {
+    <h2>{{ def().title }}</h2>
+    <p class="muted">{{ def().description }} Fields marked * are required.</p>
+  }
+
+  @if (!options() && !error()) {
+    <p class="muted">Loading…</p>
+  }
+
+  @for (section of def().sections; track section.title) {
+    <fieldset>
+      <legend>{{ section.title }}</legend>
+      @if (section.description) {
+        <p class="muted section-note">{{ section.description }}</p>
+      }
+
+      @for (field of section.fields; track field.key) {
+        <div
+          class="field"
+          [class.has-error]="errorFor(field.key)"
+          [class.check]="field.type === 'checkbox'"
+        >
+          @switch (field.type) {
+            @case ('checkbox') {
+              <label>
+                <input
+                  type="checkbox"
+                  [id]="fid(field.key)"
+                  [checked]="checked(field.key)"
+                  (change)="set(field.key, $any($event.target).checked)"
+                />
+                {{ field.label }}
+              </label>
+            }
+            @case ('select') {
+              <label [for]="fid(field.key)"
+                >{{ field.label }}
+                @if (field.required) {
+                  <span class="req"> *</span>
+                }
+              </label>
+              <select
+                [id]="fid(field.key)"
+                [value]="value(field.key)"
+                (change)="set(field.key, $any($event.target).value)"
+              >
+                <option value="">{{ field.required ? 'Choose…' : '(none)' }}</option>
+                @for (c of choices(field); track c.value) {
+                  <option [value]="c.value" [selected]="c.value === value(field.key)">
+                    {{ c.label }}
+                  </option>
+                }
+              </select>
+            }
+            @case ('suggest') {
+              <label [for]="fid(field.key)"
+                >{{ field.label }}
+                @if (field.required) {
+                  <span class="req"> *</span>
+                }
+              </label>
+              <input
+                type="text"
+                [id]="fid(field.key)"
+                [attr.list]="'l-' + fid(field.key)"
+                [value]="value(field.key)"
+                (input)="set(field.key, $any($event.target).value)"
+                autocomplete="off"
+              />
+              <datalist [id]="'l-' + fid(field.key)">
+                @for (c of choices(field); track c.value) {
+                  <option [value]="c.label"></option>
+                }
+              </datalist>
+            }
+            @case ('textarea') {
+              <label [for]="fid(field.key)"
+                >{{ field.label }}
+                @if (field.required) {
+                  <span class="req"> *</span>
+                }
+              </label>
+              <textarea
+                [id]="fid(field.key)"
+                rows="3"
+                [value]="value(field.key)"
+                (input)="set(field.key, $any($event.target).value)"
+              ></textarea>
+            }
+            @default {
+              <label [for]="fid(field.key)"
+                >{{ field.label }}
+                @if (field.required) {
+                  <span class="req"> *</span>
+                }
+              </label>
+              <input
+                [type]="field.type"
+                [id]="fid(field.key)"
+                [attr.step]="field.step ?? null"
+                [value]="value(field.key)"
+                (input)="set(field.key, $any($event.target).value)"
+              />
+            }
+          }
+          @if (field.hint) {
+            <small class="muted">{{ field.hint }}</small>
+          }
+          @if (errorFor(field.key)) {
+            <small class="error">{{ errorFor(field.key) }}</small>
+          }
+        </div>
+      }
+    </fieldset>
+  }
+
+  @if (error()) {
+    <p class="error">{{ error() }}</p>
+  }
+  @if (notice()) {
+    <p class="success">{{ notice() }}</p>
+  }
+  <button type="submit" [disabled]="busy() || !options()">{{ buttonText() }}</button>
+</form>

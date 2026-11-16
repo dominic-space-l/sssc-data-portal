@@ -22,7 +22,7 @@
     "db:stop": "supabase stop",
     "db:reset": "supabase db reset",
     "db:test": "supabase test db",
-    "db:lint": "supabase db lint --schema public,map_private --level warning --fail-on error && supabase db advisors --type security --fail-on error"
+    "db:lint": "supabase db lint --schema public,map_private,auth_private --level warning --fail-on error && supabase db advisors --type security --fail-on error"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

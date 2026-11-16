@@ -12,10 +12,14 @@
 | Path | Contents |
 | --- | --- |
 | `frontend/` | Angular app. See [frontend/README.md](frontend/README.md). |
-| `frontend/src/app/` | Root component, routes, and providers (still the CLI starter page) |
+| `frontend/src/app/` | Root component (page shell), routes, and providers |
+| `frontend/src/app/pages/` | One file per page: home, login, request access, link page, data entry, dashboard, update records, Claude connect |
+| `frontend/src/app/forms/` | `form-definitions.ts` (every form's fields) and `DataForm`, which draws any of them |
+| `frontend/src/app/services/portal-api.ts` | Every call to Supabase Auth and the Edge Functions |
+| `frontend/src/app/settings.ts` | Public settings: Supabase URL and publishable key, Turnstile site key, contact email |
 | `frontend/public/` | Static assets copied as-is into the build |
 
-There is no backend yet. Planning docs and the changelog live in [`documentation/portal/`](../documentation/portal/).
+The backend is Supabase: the Edge Functions in [`supabase/functions/`](../supabase/functions/) and the `auth_private` migrations (see [authentication/README.md](../authentication/README.md)). The look follows the SSSC Brand & Style Guide. Planning docs and the changelog live in [`documentation/portal/`](../documentation/portal/).
 
 ## Usage
 ### Quickstart

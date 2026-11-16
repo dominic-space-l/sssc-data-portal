@@ -1,0 +1,145 @@
+@if (error()) {
+  <p class="error">{{ error() }}</p>
+}
+
+@if (!records() && !error()) {
+  <p class="muted">Loading your records…</p>
+}
+
+@if (records(); as r) {
+  @if (!selected()) {
+    <p class="muted">
+      Pick what you want to update. Every change is checked by the administrator before it's saved.
+    </p>
+
+    <h2>Your stations</h2>
+    @if (r.stations.length === 0) {
+      <p class="muted">
+        {{ r.organization.name }} isn't listed as an owner or maintainer of any station yet.
+      </p>
+    } @else {
+      <div class="record-list">
+        @for (s of r.stations; track s.id) {
+          <button type="button" class="record" (click)="openStation(s.id)">
+            <strong>{{ s.name }}</strong>
+            <span class="muted">{{ s.code ? s.code + ' · ' : '' }}{{ s.roles.join(', ') }}</span>
+          </button>
+        }
+      </div>
+    }
+
+    <h2>Your contacts</h2>
+    @if (r.contacts.length === 0) {
+      <p class="muted">No contacts saved for {{ r.organization.name }}.</p>
+    } @else {
+      <div class="record-list">
+        @for (c of r.contacts; track c.id) {
+          <button type="button" class="record" (click)="openContact(c.id)">
+            <strong>{{ c.firstName }} {{ c.lastName }}</strong>
+            <span class="muted">{{ c.email }}</span>
+          </button>
+        }
+      </div>
+    }
+  } @else {
+    <button type="button" class="link back" (click)="back()">← Back to your records</button>
+
+    @if (selectedContact(); as c) {
+      <portal-data-form
+        [custom]="defs.contact"
+        [code]="code()"
+        [initial]="start('contact' + c.id, contactValues(c))"
+        [send]="send('contact', { contactId: c.id })"
+        idPrefix="contact-"
+      />
+    }
+
+    @if (loading()) {
+      <p class="muted">Loading…</p>
+    }
+
+    @if (details(); as d) {
+      <portal-data-form
+        [custom]="defs.station"
+        [code]="code()"
+        [initial]="d.station"
+        [send]="send('station', { stationId: d.station['StationID'] })"
+        idPrefix="station-"
+      />
+
+      <section class="edit-section">
+        <h2>Station contact</h2>
+        @if (d.contacts.length) {
+          <p>
+            Now:
+            @for (c of d.contacts; track c.id) {
+              <strong>{{ c.firstName }} {{ c.lastName }}</strong> ({{ c.email }}){{
+                $last ? '' : ', '
+              }}
+            }
+          </p>
+        } @else {
+          <p class="muted">This station has no contact yet.</p>
+        }
+        <portal-data-form
+          [custom]="defs.station_contact"
+          [code]="code()"
+          [compact]="true"
+          [send]="send('station_contact', { stationId: d.station['StationID'] })"
+          idPrefix="sc-"
+          submitLabel="Send new contact for review"
+        />
+      </section>
+
+      <section class="edit-section">
+        <h2>Devices</h2>
+        @if (d.devices.length === 0) {
+          <p class="muted">No devices are linked to this station.</p>
+        }
+        @for (dev of d.devices; track $index) {
+          <div class="item column">
+            <strong>{{ dev.manufacturer }} {{ dev.modelNumber }}</strong>
+            <span class="muted">{{ dev.modelName }}</span>
+            <portal-data-form
+              [custom]="defs.device"
+              [code]="code()"
+              [compact]="true"
+              [initial]="start('dev' + $index, deviceValues(dev))"
+              [send]="
+                send('device', {
+                  stationId: d.station['StationID'],
+                  deviceSpecificationId: dev.deviceSpecificationId,
+                  serialNumber: dev.serialNumber,
+                })
+              "
+              [idPrefix]="'dev' + $index + '-'"
+            />
+          </div>
+        }
+        <p class="muted">
+          To add a device to this station, use the <strong>Add new</strong> tab → Device.
+        </p>
+      </section>
+
+      <section class="edit-section">
+        <h2>Sensors</h2>
+        @if (d.sensors.length === 0) {
+          <p class="muted">No sensors are linked to this station.</p>
+        }
+        @for (sen of d.sensors; track $index) {
+          <div class="item column">
+            <strong>{{ sen.sensorName }}</strong>
+            <portal-data-form
+              [custom]="defs.sensor"
+              [code]="code()"
+              [compact]="true"
+              [initial]="start('sen' + $index, sensorValues(sen))"
+              [send]="send('sensor', { stationId: d.station['StationID'], sensorId: sen.sensorId })"
+              [idPrefix]="'sen' + $index + '-'"
+            />
+          </div>
+        }
+      </section>
+    }
+  }
+}

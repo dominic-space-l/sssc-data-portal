@@ -8,7 +8,8 @@
 //
 // "_id" gives a NEW row a temporary label. { "$ref": "label" } means "the ID of that new row".
 // On save, each labelled row is inserted first, its real ID is filled into every $ref, then the next rows go in.
-// Rows are only ever saved into tables listed in the ALLOWED_TABLES secret (comma-separated).
+// Parts are only ever built by the server's form builders (_shared/forms.ts), never sent by a browser,
+// and they can only name tables in FORM_TABLES.
 
 // deno-lint-ignore no-explicit-any
 type Sql = any;
@@ -21,14 +22,16 @@ export const MAX_PARTS = 20;
 
 export class RowError extends Error {}
 
-/** Tables outside organizations may submit to, from the ALLOWED_TABLES secret. */
-export function allowedTables(): string[] {
-  return (Deno.env.get("ALLOWED_TABLES") ?? "").split(",").map((t) => t.trim()).filter(Boolean);
-}
+/** The only tables the form builders write to. Anything else is refused, even from server code. */
+export const FORM_TABLES = [
+  "Organizations", "Contacts", "OrganizationProjects", "StationTypes", "StationSites", "Stations",
+  "StationOrganizationRole", "StationObservations", "StationContact", "Sensors", "MeasurementUnits",
+  "StationsToSensors", "DeviceManufacturers", "DeviceSpecifications", "StationsToSpecs", "SensorsToSpecs",
+] as const;
 
-export function assertAllowedTable(table: unknown): string {
-  if (typeof table !== "string" || !allowedTables().includes(table)) {
-    throw new RowError(`The table "${String(table)}" isn't open for submissions.`);
+function assertFormTable(table: unknown, p: number): string {
+  if (typeof table !== "string" || !(FORM_TABLES as readonly string[]).includes(table)) {
+    throw new RowError(`Part ${p + 1}: the table "${String(table)}" can't be written to.`);
   }
   return table;
 }
@@ -38,11 +41,11 @@ const isRef = (v: unknown): v is { $ref: string } =>
   typeof (v as Record<string, unknown>).$ref === "string";
 
 /**
- * Accepts { parts: [...] } or the older { table, rows } and returns clean parts.
- * Checks sizes, value types, and that every $ref points to a labelled row that comes earlier.
+ * Accepts { parts: [...] } and returns clean parts.
+ * Checks tables, sizes, value types, and that every $ref points to a labelled row that comes earlier.
  */
-export function normalizeParts(body: Record<string, unknown>, opts: { anyTable?: boolean } = {}): Part[] {
-  const rawParts = Array.isArray(body.parts) ? body.parts : [{ table: body.table, rows: body.rows }];
+export function normalizeParts(body: Record<string, unknown>): Part[] {
+  const rawParts = Array.isArray(body.parts) ? body.parts : [];
   if (rawParts.length === 0) throw new RowError("Nothing to submit.");
   if (rawParts.length > MAX_PARTS) throw new RowError(`Too many tables in one submission. The limit is ${MAX_PARTS}.`);
 
@@ -52,9 +55,7 @@ export function normalizeParts(body: Record<string, unknown>, opts: { anyTable?:
   return rawParts.map((rawPart, p) => {
     if (!rawPart || typeof rawPart !== "object") throw new RowError(`Part ${p + 1} is malformed.`);
     const part = rawPart as Record<string, unknown>;
-    const table = opts.anyTable
-      ? (typeof part.table === "string" && part.table ? part.table : (() => { throw new RowError(`Part ${p + 1} has no table.`); })())
-      : assertAllowedTable(part.table);
+    const table = assertFormTable(part.table, p);
     const rawRows = Array.isArray(part.rows) ? part.rows : [part.rows];
     if (rawRows.length === 0 || rawRows[0] == null) throw new RowError(`${table}: nothing to submit.`);
     total += rawRows.length;
@@ -111,7 +112,7 @@ async function writableKeys(sql: Sql, table: string, rows: Row[]): Promise<strin
   return keys;
 }
 
-async function primaryKey(sql: Sql, table: string): Promise<string> {
+export async function primaryKey(sql: Sql, table: string): Promise<string> {
   const quoted = `public."${table.replaceAll('"', '""')}"`;
   const cols = await sql`
     select a.attname as name
@@ -167,7 +168,7 @@ export async function insertParts(sql: Sql, parts: Part[]): Promise<number> {
   return saved;
 }
 
-class Rollback extends Error {}
+export class Rollback extends Error {}
 
 /** Tries the whole save and then undoes it. Returns an error message, or null if it would work. */
 export async function dryRun(sql: Sql, parts: Part[]): Promise<string | null> {
@@ -188,19 +189,4 @@ export function friendlyDbError(err: unknown): string {
   // deno-lint-ignore no-explicit-any
   const e = err as any;
   return `The data doesn't fit the table: ${e?.message ?? "unknown error"}${e?.detail ? ` (${e.detail})` : ""}`;
-}
-
-// ---------------------------------------------------------------------------
-// Dropdown lists for the link form (LOOKUP_TABLES secret, comma-separated)
-// ---------------------------------------------------------------------------
-
-export function lookupTables(): string[] {
-  return (Deno.env.get("LOOKUP_TABLES") ?? "").split(",").map((t) => t.trim()).filter(Boolean);
-}
-
-export async function readLookup(sql: Sql, table: unknown) {
-  if (typeof table !== "string" || !lookupTables().includes(table)) {
-    throw new RowError(`The list "${String(table)}" isn't available.`);
-  }
-  return await sql`select * from ${sql(table)} limit 1000`;
 }

@@ -1,0 +1,99 @@
+:host {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+.skip {
+  position: absolute;
+  left: -999px;
+  top: 0;
+  background: #fff;
+  padding: 0.5rem 1rem;
+  z-index: 10;
+  &:focus {
+    left: 0.5rem;
+  }
+}
+
+/* Deep Ink bar with white text: the guide allows the logo (and wordmark) in white over a color. */
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  padding: 0.75rem 1.25rem;
+  background: var(--deep-ink);
+  color: #fff;
+  border-bottom: 4px solid var(--tidepool-teal);
+}
+
+.brand {
+  display: flex;
+  flex-direction: column;
+  color: #fff;
+  text-decoration: none;
+  line-height: 1.2;
+}
+.brand-name {
+  font-family: var(--font-header);
+  font-weight: 900;
+  font-size: 1.15rem;
+}
+.brand-sub {
+  font-family: var(--font-subheader);
+  font-weight: 700;
+  font-size: 0.8rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  opacity: 0.85;
+}
+
+nav {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+
+  a,
+  button.link {
+    color: #fff;
+    text-decoration: none;
+    font-family: var(--font-display);
+  }
+  a.active {
+    text-decoration: underline;
+    text-underline-offset: 0.3em;
+    text-decoration-color: var(--summer-yellow);
+    text-decoration-thickness: 2px;
+  }
+}
+
+.who {
+  font-size: 0.9rem;
+  opacity: 0.85;
+}
+
+main {
+  flex: 1;
+  width: 100%;
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 1.5rem 1rem 3rem;
+}
+
+.footer {
+  background: var(--deep-ink);
+  color: #fff;
+  padding: 1.25rem 1rem;
+  font-size: 0.85rem;
+  p {
+    max-width: 960px;
+    margin: 0 auto 0.5rem;
+  }
+  .footer-org {
+    opacity: 0.8;
+    margin-bottom: 0;
+  }
+}

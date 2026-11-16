@@ -1,1 +1,410 @@
-/* You can add global styles to this file, and also import other style files */
+/**
+ * @fileoverview Global styles for the portal, following the SSSC Brand & Style Guide
+ * (documentation/SSSC Style Guide .indd.pdf).
+ *
+ * - Colors: the guide's palette. Primary colors carry the page; secondary colors are accents
+ *   (the guide asks that an accent take up no more than about 20% of a page). Darker shades of a
+ *   palette color are used where the original isn't readable as text on white (the guide allows
+ *   shades of the same hue).
+ * - Fonts: the guide's typefaces are Museo, Museo Sans and Museo Sans Condensed. They're licensed
+ *   fonts, so no font files are included here. If SSSC provides a web font kit (for example Adobe
+ *   Fonts), load it in index.html and these stacks pick it up; until then the system fallbacks show.
+ */
+
+:root {
+  /* Primary colors */
+  --ocean-blue: #284782;
+  --tidepool-teal: #297a86;
+  --deep-ink: #0a343a;
+  /* Secondary colors (accents) */
+  --earth-brown: #a76d4f;
+  --rusty-red: #eb6f47;
+  --rainforest-green: #81c566;
+  --aquarium-blue: #00b2ad;
+  --summer-yellow: #fcd26f;
+  /* Shades of palette colors for text and backgrounds (readable on white) */
+  --rusty-red-dark: #a8401f;
+  --rainforest-green-light: #ebf6e5;
+  --rusty-red-light: #fdeee9;
+  --ocean-blue-light: #e9edf5;
+
+  --text: var(--deep-ink);
+  --muted: #47605f;
+  --bg: #f5f7f7;
+  --panel: #ffffff;
+  --line: #cfd9d9;
+  --accent: var(--ocean-blue);
+  --accent-text: #ffffff;
+  --danger: var(--rusty-red-dark);
+  --success-bg: var(--rainforest-green-light);
+  --error-bg: var(--rusty-red-light);
+
+  /* Museo for headers, Museo Sans for display, Museo Sans Condensed for subheaders, Museo for body */
+  --font-header: 'museo', 'Museo', 'Rockwell', 'Georgia', serif;
+  --font-display:
+    'museo-sans', 'Museo Sans', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-subheader:
+    'museo-sans-condensed', 'Museo Sans Condensed', 'Arial Narrow', 'Roboto Condensed', sans-serif;
+  --font-body: 'museo', 'Museo', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  color-scheme: light;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 16px/1.5 var(--font-body);
+}
+
+/* Header (Museo 900) and subheader (Museo Sans Condensed 700) from the guide's font hierarchy */
+h1 {
+  font-family: var(--font-header);
+  font-weight: 900;
+  font-size: 1.75rem;
+  line-height: 1.15;
+  color: var(--ocean-blue);
+  margin: 0 0 0.75rem;
+}
+h2 {
+  font-family: var(--font-subheader);
+  font-weight: 700;
+  font-size: 1.05rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--tidepool-teal);
+  margin: 1.5rem 0 0.5rem;
+}
+a {
+  color: var(--ocean-blue);
+}
+a:focus-visible,
+button:focus-visible {
+  outline: 3px solid var(--aquarium-blue);
+  outline-offset: 2px;
+}
+
+/* "Less important information" (Museo 700 italic in the guide) */
+.muted {
+  color: var(--muted);
+}
+.req {
+  color: var(--danger);
+}
+.error {
+  color: var(--danger);
+  background: var(--error-bg);
+  padding: 0.5rem 0.75rem;
+  border-radius: 6px;
+  border-left: 4px solid var(--rusty-red);
+}
+small.error {
+  display: block;
+  padding: 0.15rem 0.5rem;
+  margin-top: 0.25rem;
+}
+.success {
+  background: var(--success-bg);
+  padding: 0.5rem 0.75rem;
+  border-radius: 6px;
+  border-left: 4px solid var(--rainforest-green);
+}
+
+/* Forms */
+.narrow {
+  max-width: 460px;
+}
+fieldset {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  padding: 0.75rem 1rem 0.25rem;
+  margin: 0 0 1rem;
+  min-width: 0;
+}
+legend {
+  font-family: var(--font-subheader);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--tidepool-teal);
+  padding: 0 0.35rem;
+}
+.section-note {
+  margin: 0 0 0.75rem;
+}
+.field {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 0.85rem;
+}
+.field label {
+  font-weight: 600;
+  margin-bottom: 0.2rem;
+}
+.field.check label {
+  font-weight: 400;
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+.field small.muted {
+  margin-top: 0.2rem;
+  font-style: italic;
+}
+.field.has-error input,
+.field.has-error select,
+.field.has-error textarea {
+  border-color: var(--danger);
+}
+
+input,
+select,
+textarea {
+  font: inherit;
+  padding: 0.45rem 0.6rem;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #fff;
+  color: var(--text);
+  width: 100%;
+}
+input[type='checkbox'],
+input[type='radio'] {
+  width: auto;
+  accent-color: var(--ocean-blue);
+}
+input:focus,
+select:focus,
+textarea:focus {
+  outline: 2px solid var(--aquarium-blue);
+  outline-offset: 1px;
+}
+
+button,
+.button {
+  font: inherit;
+  font-family: var(--font-display);
+  font-weight: 700;
+  display: inline-block;
+  padding: 0.45rem 1rem;
+  border-radius: 6px;
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  color: var(--accent-text);
+  cursor: pointer;
+  text-decoration: none;
+}
+button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+button.secondary,
+.button.secondary {
+  background: transparent;
+  color: var(--accent);
+}
+button.danger {
+  background: transparent;
+  color: var(--danger);
+  border-color: var(--danger);
+}
+button.link {
+  background: none;
+  border: none;
+  color: inherit;
+  padding: 0;
+  font-weight: 400;
+  text-decoration: underline;
+}
+
+.captcha {
+  margin: 0.5rem 0 1rem;
+  min-height: 65px;
+}
+
+/* Tabs (form picker) */
+.tabs {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+}
+.tabs button {
+  background: transparent;
+  color: var(--accent);
+}
+.tabs button.active {
+  background: var(--accent);
+  color: var(--accent-text);
+}
+
+/* Cards (home and the input menu) */
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1rem;
+  margin: 1rem 0;
+}
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  padding: 1rem;
+  border: 1px solid var(--line);
+  border-top: 4px solid var(--tidepool-teal);
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--text);
+  font-family: var(--font-display);
+  font-weight: 700;
+  text-decoration: none;
+}
+.card .muted {
+  font-family: var(--font-body);
+  font-weight: 400;
+}
+.card:hover {
+  border-color: var(--ocean-blue);
+}
+.back {
+  display: inline-block;
+  margin-bottom: 1rem;
+}
+
+/* Dashboard */
+.row-between {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+}
+.item {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  padding: 0.85rem 1rem;
+  margin-bottom: 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+}
+.item.column {
+  flex-direction: column;
+}
+.item > * {
+  min-width: 0;
+  max-width: 100%;
+}
+.item p {
+  margin: 0.35rem 0 0;
+}
+.actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  align-items: flex-start;
+}
+.link-box {
+  padding: 0.85rem 1rem;
+  margin-bottom: 1rem;
+  border: 1px solid var(--tidepool-teal);
+  border-radius: 8px;
+  background: var(--ocean-blue-light);
+}
+.link-box code {
+  display: block;
+  margin: 0.5rem 0;
+  word-break: break-all;
+}
+.preview {
+  margin-top: 0.5rem;
+  min-width: 0;
+}
+.table-wrap {
+  overflow-x: auto;
+}
+table {
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+th,
+td {
+  border: 1px solid var(--line);
+  padding: 0.25rem 0.5rem;
+  text-align: left;
+  white-space: nowrap;
+}
+th {
+  background: var(--bg);
+}
+
+/* Update links and edits */
+.badge {
+  display: inline-block;
+  margin-left: 0.4rem;
+  padding: 0.05rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  background: var(--ocean-blue-light);
+  color: var(--ocean-blue);
+  border: 1px solid var(--ocean-blue);
+}
+.badge.danger {
+  background: var(--error-bg);
+  color: var(--danger);
+  border-color: var(--danger);
+}
+table.diff td.was {
+  color: var(--muted);
+  text-decoration: line-through;
+}
+table.diff td.now {
+  font-weight: 700;
+}
+.create-link select,
+.item select {
+  width: auto;
+  max-width: 100%;
+}
+fieldset.choice label {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  margin-bottom: 0.35rem;
+  font-weight: 400;
+}
+.record-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+.record {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.2rem;
+  text-align: left;
+  background: var(--panel);
+  color: var(--text);
+  border: 1px solid var(--line);
+  padding: 0.75rem 1rem;
+}
+.record:hover {
+  border-color: var(--ocean-blue);
+}
+.record .muted {
+  font-size: 0.9rem;
+  font-weight: 400;
+}
+.edit-section {
+  margin-top: 1.5rem;
+}
+.edit-section .item fieldset {
+  margin-top: 0.5rem;
+}

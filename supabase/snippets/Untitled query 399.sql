@@ -1,0 +1,1 @@
+select u.email from auth_private.admins a join auth.users u on u.id = a.user_id;
