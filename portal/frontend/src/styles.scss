@@ -39,6 +39,16 @@
   --success-bg: var(--rainforest-green-light);
   --error-bg: var(--rusty-red-light);
 
+  /* Shape and motion. Shadows are Deep Ink at low opacity, so they stay inside the palette. */
+  --radius: 10px;
+  --radius-sm: 8px;
+  --shadow-sm: 0 1px 2px rgb(10 52 58 / 6%);
+  --shadow: 0 1px 2px rgb(10 52 58 / 6%), 0 4px 12px rgb(10 52 58 / 6%);
+  --shadow-hover: 0 2px 4px rgb(10 52 58 / 8%), 0 8px 20px rgb(10 52 58 / 8%);
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --fast: 150ms;
+  --medium: 200ms;
+
   /* Museo for headers, Museo Sans for display, Museo Sans Condensed for subheaders, Museo for body */
   --font-header: 'museo', 'Museo', 'Rockwell', 'Georgia', serif;
   --font-display:
@@ -57,7 +67,19 @@ body {
   margin: 0;
   background: var(--bg);
   color: var(--text);
-  font: 16px/1.5 var(--font-body);
+  font: 16px/1.55 var(--font-body);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Readable line length for running text (messages and link boxes keep the full width) */
+p,
+.field small {
+  max-width: 65ch;
+}
+p.success,
+p.error,
+.link-box p {
+  max-width: none;
 }
 
 /* Header (Museo 900) and subheader (Museo Sans Condensed 700) from the guide's font hierarchy */
@@ -80,6 +102,7 @@ h2 {
 }
 a {
   color: var(--ocean-blue);
+  text-underline-offset: 0.2em;
 }
 a:focus-visible,
 button:focus-visible {
@@ -97,9 +120,10 @@ button:focus-visible {
 .error {
   color: var(--danger);
   background: var(--error-bg);
-  padding: 0.5rem 0.75rem;
-  border-radius: 6px;
+  padding: 0.6rem 0.85rem;
+  border-radius: var(--radius-sm);
   border-left: 4px solid var(--rusty-red);
+  animation: appear var(--medium) var(--ease-out);
 }
 small.error {
   display: block;
@@ -108,9 +132,18 @@ small.error {
 }
 .success {
   background: var(--success-bg);
-  padding: 0.5rem 0.75rem;
-  border-radius: 6px;
+  padding: 0.6rem 0.85rem;
+  border-radius: var(--radius-sm);
   border-left: 4px solid var(--rainforest-green);
+  animation: appear var(--medium) var(--ease-out);
+}
+
+/* Things that appear after an action (messages, new links) fade and rise in, never from nothing */
+@keyframes appear {
+  from {
+    opacity: 0;
+    transform: translateY(4px) scale(0.98);
+  }
 }
 
 /* Forms */
@@ -119,10 +152,11 @@ small.error {
 }
 fieldset {
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: var(--radius);
   background: var(--panel);
-  padding: 0.75rem 1rem 0.25rem;
-  margin: 0 0 1rem;
+  box-shadow: var(--shadow-sm);
+  padding: 1rem 1.25rem 0.35rem;
+  margin: 0 0 1.25rem;
   min-width: 0;
 }
 legend {
@@ -165,23 +199,38 @@ input,
 select,
 textarea {
   font: inherit;
-  padding: 0.45rem 0.6rem;
+  min-height: 44px;
+  padding: 0.5rem 0.7rem;
   border: 1px solid var(--line);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   background: #fff;
   color: var(--text);
   width: 100%;
+  transition:
+    border-color var(--fast) ease,
+    box-shadow var(--fast) ease;
+}
+input:hover,
+select:hover,
+textarea:hover {
+  border-color: #a9bcbc;
+}
+textarea {
+  min-height: 88px;
 }
 input[type='checkbox'],
 input[type='radio'] {
-  width: auto;
+  width: 18px;
+  height: 18px;
+  min-height: 0;
   accent-color: var(--ocean-blue);
 }
 input:focus,
 select:focus,
 textarea:focus {
-  outline: 2px solid var(--aquarium-blue);
-  outline-offset: 1px;
+  outline: none;
+  border-color: var(--tidepool-teal);
+  box-shadow: 0 0 0 3px rgb(0 178 173 / 25%); /* Aquarium Blue ring */
 }
 
 button,
@@ -189,14 +238,32 @@ button,
   font: inherit;
   font-family: var(--font-display);
   font-weight: 700;
-  display: inline-block;
-  padding: 0.45rem 1rem;
-  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 0.5rem 1.1rem;
+  border-radius: var(--radius-sm);
   border: 1px solid var(--accent);
   background: var(--accent);
   color: var(--accent-text);
   cursor: pointer;
   text-decoration: none;
+  transition:
+    background-color var(--fast) ease,
+    border-color var(--fast) ease,
+    color var(--fast) ease,
+    transform var(--fast) var(--ease-out);
+}
+button:hover:not(:disabled),
+.button:hover {
+  background: #1f3a6b; /* a darker shade of Ocean Blue */
+  border-color: #1f3a6b;
+}
+/* Pressed: a small squeeze so the click is felt */
+button:active:not(:disabled),
+.button:active {
+  transform: scale(0.97);
 }
 button:disabled {
   opacity: 0.55;
@@ -207,15 +274,26 @@ button.secondary,
   background: transparent;
   color: var(--accent);
 }
+button.secondary:hover:not(:disabled),
+.button.secondary:hover {
+  background: var(--ocean-blue-light);
+  color: var(--accent);
+}
 button.danger {
   background: transparent;
   color: var(--danger);
   border-color: var(--danger);
 }
-button.link {
+button.danger:hover:not(:disabled) {
+  background: var(--error-bg);
+  border-color: var(--danger);
+}
+button.link,
+button.link:hover:not(:disabled) {
   background: none;
   border: none;
   color: inherit;
+  min-height: 0;
   padding: 0;
   font-weight: 400;
   text-decoration: underline;
@@ -233,13 +311,29 @@ button.link {
   flex-wrap: wrap;
   margin-bottom: 1rem;
 }
+.tabs {
+  padding: 4px;
+  gap: 4px;
+  background: var(--ocean-blue-light);
+  border-radius: var(--radius);
+  width: fit-content;
+  max-width: 100%;
+}
 .tabs button {
   background: transparent;
+  border-color: transparent;
   color: var(--accent);
 }
-.tabs button.active {
-  background: var(--accent);
-  color: var(--accent-text);
+.tabs button:hover:not(:disabled) {
+  background: rgb(255 255 255 / 60%);
+  border-color: transparent;
+}
+.tabs button.active,
+.tabs button.active:hover:not(:disabled) {
+  background: var(--panel);
+  border-color: var(--line);
+  color: var(--accent);
+  box-shadow: var(--shadow-sm);
 }
 
 /* Cards (home and the input menu) */
@@ -253,15 +347,20 @@ button.link {
   display: flex;
   flex-direction: column;
   gap: 0.3rem;
-  padding: 1rem;
+  padding: 1.1rem 1.15rem;
   border: 1px solid var(--line);
   border-top: 4px solid var(--tidepool-teal);
-  border-radius: 8px;
+  border-radius: var(--radius);
   background: var(--panel);
+  box-shadow: var(--shadow-sm);
   color: var(--text);
   font-family: var(--font-display);
   font-weight: 700;
   text-decoration: none;
+  transition:
+    box-shadow var(--medium) var(--ease-out),
+    transform var(--medium) var(--ease-out),
+    border-color var(--fast) ease;
 }
 .card .muted {
   font-family: var(--font-body);
@@ -269,6 +368,11 @@ button.link {
 }
 .card:hover {
   border-color: var(--ocean-blue);
+  box-shadow: var(--shadow-hover);
+  transform: translateY(-2px);
+}
+.card:active {
+  transform: translateY(0) scale(0.99);
 }
 .back {
   display: inline-block;
@@ -287,11 +391,12 @@ button.link {
   justify-content: space-between;
   gap: 1rem;
   flex-wrap: wrap;
-  padding: 0.85rem 1rem;
+  padding: 1rem 1.15rem;
   margin-bottom: 0.75rem;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: var(--radius);
   background: var(--panel);
+  box-shadow: var(--shadow-sm);
 }
 .item.column {
   flex-direction: column;
@@ -310,11 +415,12 @@ button.link {
   align-items: flex-start;
 }
 .link-box {
-  padding: 0.85rem 1rem;
+  padding: 1rem 1.15rem;
   margin-bottom: 1rem;
   border: 1px solid var(--tidepool-teal);
-  border-radius: 8px;
+  border-radius: var(--radius);
   background: var(--ocean-blue-light);
+  animation: appear var(--medium) var(--ease-out);
 }
 .link-box code {
   display: block;
@@ -331,6 +437,7 @@ button.link {
 table {
   border-collapse: collapse;
   font-size: 0.9rem;
+  font-variant-numeric: tabular-nums; /* numbers line up in columns */
 }
 th,
 td {
@@ -375,10 +482,11 @@ table.diff td.now {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  padding: 1rem;
+  padding: 1.1rem 1.15rem;
   border: 1px solid var(--line);
   border-top: 4px solid var(--tidepool-teal);
-  border-radius: 8px;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
   background: var(--panel);
   min-width: 0;
 }
@@ -417,15 +525,25 @@ fieldset.choice label {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
+  justify-content: flex-start;
   gap: 0.2rem;
   text-align: left;
   background: var(--panel);
   color: var(--text);
   border: 1px solid var(--line);
-  padding: 0.75rem 1rem;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+  padding: 0.85rem 1rem;
+  transition:
+    box-shadow var(--medium) var(--ease-out),
+    transform var(--medium) var(--ease-out),
+    border-color var(--fast) ease;
 }
-.record:hover {
+.record:hover:not(:disabled) {
+  background: var(--panel);
   border-color: var(--ocean-blue);
+  box-shadow: var(--shadow-hover);
+  transform: translateY(-1px);
 }
 .record .muted {
   font-size: 0.9rem;
@@ -436,4 +554,21 @@ fieldset.choice label {
 }
 .edit-section .item fieldset {
   margin-top: 0.5rem;
+}
+
+/* Anyone who asks their device for less motion gets none */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+  button:active:not(:disabled),
+  .button:active,
+  .card:hover,
+  .card:active,
+  .record:hover:not(:disabled) {
+    transform: none;
+  }
 }

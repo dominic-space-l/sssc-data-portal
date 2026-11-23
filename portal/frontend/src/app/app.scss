@@ -58,15 +58,24 @@ nav {
 
   a,
   button.link {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
     color: #fff;
-    text-decoration: none;
-    font-family: var(--font-display);
-  }
-  a.active {
     text-decoration: underline;
-    text-underline-offset: 0.3em;
-    text-decoration-color: var(--summer-yellow);
+    text-decoration-color: transparent;
+    text-underline-offset: 0.35em;
     text-decoration-thickness: 2px;
+    font-family: var(--font-display);
+    transition: text-decoration-color var(--fast) ease;
+  }
+  a:hover,
+  button.link:hover {
+    text-decoration-color: rgb(255 255 255 / 45%);
+  }
+  a.active,
+  a.active:hover {
+    text-decoration-color: var(--summer-yellow);
   }
 }
 
