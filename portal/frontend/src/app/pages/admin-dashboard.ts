@@ -4,6 +4,7 @@
 // Edits show each change as Now -> Change to.
 
 import { Component, inject, OnInit, signal } from '@angular/core';
+import { fieldLabel, plural } from '../shared/text';
 import {
   AccessRequest,
   Change,
@@ -36,6 +37,7 @@ export class AdminDashboard implements OnInit {
 
   protected readonly requests = signal<AccessRequest[] | null>(null);
   protected readonly submissions = signal<Submission[] | null>(null);
+  protected readonly loading = signal(true);
   protected readonly error = signal('');
   protected readonly notice = signal('');
   protected readonly busyId = signal('');
@@ -72,10 +74,12 @@ export class AdminDashboard implements OnInit {
 
   protected async refresh() {
     this.error.set('');
+    this.loading.set(true);
     const [reqs, subs] = await Promise.all([
       this.api.listAccessRequests(),
       this.api.listSubmissions(),
     ]);
+    this.loading.set(false);
     if (reqs.ok) this.requests.set(reqs.requests);
     else this.error.set(reqs.message);
     if (subs.ok) this.submissions.set(subs.submissions);
@@ -161,8 +165,8 @@ export class AdminDashboard implements OnInit {
       (res: { saved: number }) =>
         this.notice.set(
           s.kind === 'edit'
-            ? `Applied ${res.saved} change${res.saved === 1 ? '' : 's'} from ${s.org_name ?? 'the organization'}.`
-            : `Saved ${res.saved} rows from ${s.org_name ?? 'the submission'}.`,
+            ? `Applied ${plural(res.saved, 'change')} from ${s.org_name ?? 'the organization'}.`
+            : `Saved ${plural(res.saved, 'row')} from ${s.org_name ?? 'the submission'}.`,
         ),
     );
   }
@@ -214,11 +218,14 @@ export class AdminDashboard implements OnInit {
     return [...keys];
   }
 
+  protected readonly fieldLabel = fieldLabel;
+  protected readonly plural = plural;
+
   protected changedFields(c: Change): string[] {
     return Object.keys(c.after ?? {}).filter((f) => !HIDDEN_FIELDS.has(f));
   }
 
-  /** A value in the Now / Change to columns. */
+  /** A value in the When sent / Change to columns. */
   protected diffCell(value: unknown): string {
     if (value === null || value === undefined || value === '') return '(empty)';
     if (typeof value === 'boolean') return value ? 'yes' : 'no';

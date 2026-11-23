@@ -8,8 +8,10 @@
   </a>
   <nav aria-label="Main">
     @if (api.user(); as user) {
-      <a routerLink="/forms" routerLinkActive="active">Add data</a>
-      <a routerLink="/admin" routerLinkActive="active">Dashboard</a>
+      @if (api.isAdmin()) {
+        <a routerLink="/forms" routerLinkActive="active">Add data</a>
+        <a routerLink="/admin" routerLinkActive="active">Dashboard</a>
+      }
       <span class="who">{{ user.email }}</span>
       <button type="button" class="link" (click)="logout()">Log out</button>
     } @else {

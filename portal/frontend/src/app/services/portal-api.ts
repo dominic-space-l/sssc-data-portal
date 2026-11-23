@@ -126,15 +126,51 @@ export class PortalApi {
     SETTINGS.supabasePublishableKey,
   );
 
-  /** The logged-in admin, or null. Pages can read this to show or hide things. */
+  /** Whoever is logged in (admin or not), or null. Pages can read this to show or hide things. */
   readonly user = signal<PortalUser | null>(null);
+
+  /**
+   * Whether the logged-in user is in the admins table: null until checked. Only used to show the
+   * right menu and pages; the server checks again on every admin action.
+   */
+  readonly isAdmin = signal<boolean | null>(null);
+  private adminCheckedFor = '';
 
   constructor() {
     this.db.auth.onAuthStateChange((_event, session) => {
-      this.user.set(
-        session?.user ? { id: session.user.id, email: session.user.email ?? '' } : null,
-      );
+      const user = session?.user ? { id: session.user.id, email: session.user.email ?? '' } : null;
+      if (user?.id !== this.user()?.id) this.forgetAdmin();
+      this.user.set(user);
+      // Deferred: calling Supabase inside this callback can deadlock (see supabase-js docs).
+      if (user) setTimeout(() => void this.checkAdmin(), 0);
     });
+  }
+
+  private forgetAdmin() {
+    this.adminCheckedFor = '';
+    this.isAdmin.set(null);
+  }
+
+  /**
+   * Asks the server whether the logged-in user is an admin (admins are only managed in Supabase).
+   * Uses list_requests, the cheapest admin-only call: it answers 401 for anyone not in the admins
+   * table. Any other failure (e.g. offline) isn't treated as "not an admin".
+   */
+  async checkAdmin(): Promise<boolean> {
+    const user = this.user() ?? (await this.getUser());
+    if (!user) {
+      this.forgetAdmin();
+      return false;
+    }
+    if (this.adminCheckedFor === user.id && this.isAdmin() !== null) return this.isAdmin()!;
+    const { error } = await this.db.functions.invoke('admin-api', {
+      body: { action: 'list_requests' },
+    });
+    const status = (error as { context?: Response } | null)?.context?.status;
+    const admin = !error || status !== 401;
+    this.adminCheckedFor = user.id;
+    this.isAdmin.set(admin);
+    return admin;
   }
 
   /** Calls an Edge Function and always returns { ok, ... } with a readable message on errors. */
@@ -156,6 +192,7 @@ export class PortalApi {
     const { data, error } = await this.db.auth.signInWithPassword({ email, password });
     if (error) return { ok: false, message: error.message };
     const user = { id: data.user.id, email: data.user.email ?? '' };
+    if (user.id !== this.user()?.id) this.forgetAdmin();
     this.user.set(user);
     return { ok: true, user };
   }
@@ -164,6 +201,7 @@ export class PortalApi {
     const { error } = await this.db.auth.signOut();
     if (error) return { ok: false, message: error.message };
     this.user.set(null);
+    this.forgetAdmin();
     return { ok: true };
   }
 
@@ -171,6 +209,7 @@ export class PortalApi {
   async getUser(): Promise<PortalUser | null> {
     const { data, error } = await this.db.auth.getUser();
     const user = error || !data.user ? null : { id: data.user.id, email: data.user.email ?? '' };
+    if (user?.id !== this.user()?.id) this.forgetAdmin();
     this.user.set(user);
     return user;
   }

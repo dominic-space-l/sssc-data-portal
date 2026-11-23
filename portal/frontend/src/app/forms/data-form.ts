@@ -8,6 +8,7 @@
 import { Component, computed, effect, inject, input, output, signal } from '@angular/core';
 import { FieldDef, FORM_DEFS, FormDef } from './form-definitions';
 import { Fields, FormName, FormOptions, PortalApi, Result } from '../services/portal-api';
+import { plural } from '../shared/text';
 
 interface Choice {
   value: string;
@@ -155,7 +156,7 @@ export class DataForm {
     this.submitted.emit(
       this.code()
         ? 'Thanks! Your submission was sent for review.'
-        : `Saved (${'saved' in result ? result.saved : 0} rows added).`,
+        : `Saved (${plural('saved' in result ? Number(result.saved) : 0, 'row')} added).`,
     );
   }
 }

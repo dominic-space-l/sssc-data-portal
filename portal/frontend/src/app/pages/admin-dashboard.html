@@ -54,7 +54,7 @@
 <section>
   <h2>Access requests</h2>
   @if (requests() === null) {
-    <p class="muted">Loading…</p>
+    <p class="muted">{{ loading() ? 'Loading…' : "Couldn't load. Try Refresh." }}</p>
   } @else if (requests()!.length === 0) {
     <p class="muted">No requests waiting.</p>
   } @else {
@@ -105,7 +105,7 @@
 <section>
   <h2>Submissions to review</h2>
   @if (submissions() === null) {
-    <p class="muted">Loading…</p>
+    <p class="muted">{{ loading() ? 'Loading…' : "Couldn't load. Try Refresh." }}</p>
   } @else if (submissions()!.length === 0) {
     <p class="muted">No submissions waiting.</p>
   } @else {
@@ -118,10 +118,10 @@
           }
           <span class="muted">
             @if (s.kind === 'edit') {
-              · {{ s.row_count }} change{{ s.row_count === 1 ? '' : 's' }} ·
+              · {{ plural(s.row_count, 'record') }} to change ·
               {{ when(s.submitted_at) }}
             } @else {
-              · {{ s.form ? s.form + ' form' : 'data' }} · {{ s.row_count }} rows ·
+              · {{ s.form ? s.form + ' form' : 'data' }} · {{ plural(s.row_count, 'row') }} ·
               {{ when(s.submitted_at) }}
             }
             @if (s.email) {
@@ -147,14 +147,14 @@
                   <thead>
                     <tr>
                       <th>Field</th>
-                      <th>Now</th>
+                      <th>When sent</th>
                       <th>Change to</th>
                     </tr>
                   </thead>
                   <tbody>
                     @for (f of changedFields(c); track f) {
                       <tr>
-                        <td>{{ f }}</td>
+                        <td>{{ fieldLabel(f) }}</td>
                         <td class="was">{{ diffCell(c.before?.[f]) }}</td>
                         <td class="now">{{ diffCell(c.after?.[f]) }}</td>
                       </tr>
