@@ -173,7 +173,7 @@ Deno.serve(async (req) => {
         const result = await sql.begin(async (tx: typeof sql) => {
           const [submission] = await tx`
             update auth_private.pending_submissions
-            set status = 'rejected', reviewed_at = now(), review_note = ${body.newLink ? "rejected, new link sent" : "rejected"}
+            set status = 'rejected', reviewed_at = now()
             where id = ${body.id as string} and status = 'pending'
             returning link_id`;
           if (!submission) return null;
