@@ -3,6 +3,18 @@
 Versioning follows `xx.yy.zz` (see [documentation/CLAUDECODE/CLAUDE.md](../CLAUDECODE/CLAUDE.md)):
 `xx` = major feature, `yy` = steps/commits toward a major feature, `zz` = small updates and revisions.
 
+## 0.3.1 — 2026-11-23
+
+Fixes and additions from testing the demo end to end (authentication 0.3.1).
+- **Dashboard:** a failed action's error now stays on screen (it was cleared by the list reload, so a refused approval looked like nothing happened). "Couldn't load" replaces an endless "Loading…". Edits show a "When sent" column with readable field names. Counts say "1 row" / "1 record to change".
+- **New data link without a request:** the dashboard can create a new-data link for an organization that emailed directly (organization name + email). It sits next to the update link, and each box explains what it's for. Link boxes show when the link expires, and the email text says what the form covers.
+- **Non-admin logins:** accounts not in `auth_private.admins` no longer see Add data or Dashboard. Admin pages send them to the login page with a "not an admin account" message.
+- **Forms:** an old "Saved" message is cleared when the form is sent again. The update page's add-device hint points to the single form.
+
+**Files changed**
+- `portal/frontend/src/app/` (`app.html`, `forms/data-form.ts`, `guards/admin.guard.ts`, `pages/admin-dashboard.*`, `pages/admin-forms.ts`, `pages/login.ts`, `pages/submit.ts`, `pages/update-records.html`, `services/portal-api.ts`, new `shared/text.ts` + spec), `portal/frontend/src/styles.scss`
+- `documentation/portal/CHANGELOG.md`
+
 ## 0.3.0 — 2026-11-16
 
 The portal's first real pages, connected to authentication (authentication 0.3.0), styled with the SSSC Brand & Style Guide.

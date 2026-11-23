@@ -3,6 +3,15 @@
 Versioning follows `xx.yy.zz` (see [documentation/CLAUDECODE/CLAUDE.md](../CLAUDECODE/CLAUDE.md)):
 `xx` = major feature, `yy` = steps/commits toward a major feature, `zz` = small updates and revisions.
 
+## 0.3.1 — 2026-11-23
+
+- **Fixed:** rejecting a submission (Reject, Reject + new link) failed every time. `admin-api` wrote a `review_note` column that doesn't exist in `auth_private.pending_submissions`.
+- **Added:** `admin-api` action `create_new_link { orgName, email, contactName? }`. It creates a new-data link without a request and stores it as an approved request, so the submission shows who it's from.
+
+**Files changed**
+- `supabase/functions/admin-api/index.ts`
+- `documentation/authentication/CHANGELOG.md`
+
 ## 0.3.0 — 2026-11-16
 
 Authentication moved onto the shared database and into the portal, following the [Supabase assessment](supabase_assessment.md). Elias's single combined form ("Enter information") is now a portal form.

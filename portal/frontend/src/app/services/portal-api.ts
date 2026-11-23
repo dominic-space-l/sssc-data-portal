@@ -300,6 +300,11 @@ export class PortalApi {
     });
   }
   /** An update link for an organization, without a request. */
+  /** A new-data link without a request, e.g. for a new organization that emailed. */
+  createNewLink(orgName: string, email: string) {
+    return this.call<NewLink>('admin-api', { action: 'create_new_link', orgName, email });
+  }
+
   createEditLink(organizationId: number) {
     return this.call<NewLink>('admin-api', { action: 'create_edit_link', organizationId });
   }

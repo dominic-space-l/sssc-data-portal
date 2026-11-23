@@ -366,6 +366,35 @@ table.diff td.was {
 table.diff td.now {
   font-weight: 700;
 }
+.link-options {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 1rem;
+}
+.link-option {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 1rem;
+  border: 1px solid var(--line);
+  border-top: 4px solid var(--tidepool-teal);
+  border-radius: 8px;
+  background: var(--panel);
+  min-width: 0;
+}
+.link-option .field {
+  align-self: stretch;
+}
+h3 {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.05rem;
+  color: var(--ocean-blue);
+  margin: 0 0 0.35rem;
+}
+.link-box p {
+  margin: 0 0 0.5rem;
+}
 .create-link select,
 .item select {
   width: auto;

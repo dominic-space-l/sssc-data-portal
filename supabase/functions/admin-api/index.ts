@@ -8,6 +8,10 @@
 //                                             With organizationId: an UPDATE link for that organization
 //                                             (required when the request asked to update existing data)
 //   create_edit_link   { organizationId }  -> an update link without a request (e.g. the organization emailed)
+//   create_new_link    { orgName, email, contactName? }
+//                                          -> a new-data link without a request (e.g. a new organization
+//                                             emailed). Saved as an approved request so the submission
+//                                             shows who it's from.
 //   reject_request     { id }              -> marks rejected
 //   list_submissions                       -> outside submissions waiting for review
 //   approve_submission { id }              -> new data: saves every part (all or none)
@@ -110,6 +114,31 @@ Deno.serve(async (req) => {
         if (!orgName) return json({ ok: false, message: "Pick an organization." }, 400);
         const link = await createLink(sql, null, { kind: "edit", organizationId });
         return json({ ok: true, email: null, orgName, ...link });
+      }
+
+      case "create_new_link": {
+        const orgName = String(body.orgName ?? "").trim();
+        const email = String(body.email ?? "").trim();
+        const contactName = String(body.contactName ?? "").trim() || null;
+        if (!orgName || orgName.length > 200) {
+          return json({ ok: false, field: "orgName", message: "Enter the organization's name." }, 400);
+        }
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 320) {
+          return json({ ok: false, field: "email", message: "Enter a valid email address." }, 400);
+        }
+        if (contactName && contactName.length > 200) {
+          return json({ ok: false, field: "contactName", message: "That name is too long." }, 400);
+        }
+        const link = await sql.begin(async (tx: typeof sql) => {
+          const [request] = await tx`
+            insert into auth_private.access_requests
+              (org_name, contact_name, email, reason, kind, status, reviewed_at)
+            values (${orgName}, ${contactName}, ${email}, 'Link created by an admin (no request).',
+                    'new', 'approved', now())
+            returning id`;
+          return await createLink(tx, request.id, { kind: "new" });
+        });
+        return json({ ok: true, email, orgName, ...link });
       }
 
       case "reject_request": {

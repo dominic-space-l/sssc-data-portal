@@ -149,6 +149,20 @@ export class AdminDashboard implements OnInit {
     );
   }
 
+  protected createNewLink(event: Event, orgName: string, email: string) {
+    event.preventDefault();
+    const form = event.target as HTMLFormElement;
+    this.act(
+      'new-link',
+      () => this.api.createNewLink(orgName.trim(), email.trim()),
+      (res: NewLink) => {
+        this.keepLink('new-link', res);
+        form.reset();
+        this.notice.set(`New data link created for ${res.orgName}. Email it to them.`);
+      },
+    );
+  }
+
   protected rejectRequest(r: AccessRequest) {
     if (!confirm(`Reject the request from ${r.org_name}?`)) return;
     this.act(
@@ -162,12 +176,14 @@ export class AdminDashboard implements OnInit {
     this.act(
       s.id,
       () => this.api.approveSubmission(s.id),
-      (res: { saved: number }) =>
+      (res: { saved: number }) => {
+        if (s.kind !== 'edit') void this.loadOrganizations(); // a new organization may have been added
         this.notice.set(
           s.kind === 'edit'
             ? `Applied ${plural(res.saved, 'change')} from ${s.org_name ?? 'the organization'}.`
             : `Saved ${plural(res.saved, 'row')} from ${s.org_name ?? 'the submission'}.`,
-        ),
+        );
+      },
     );
   }
 
@@ -200,8 +216,9 @@ export class AdminDashboard implements OnInit {
       l.kind === 'edit'
         ? `Hello${l.orgName ? ' ' + l.orgName : ''},\n\nHere is your link to update your stations, contacts, devices and sensors:\n${l.link}\n\n` +
             `You can send as many changes as you need until ${expires}. Each change is reviewed before it's saved.\n`
-        : `Hello${l.orgName ? ' ' + l.orgName : ''},\n\nHere is your one-time link to submit data:\n${l.link}\n\n` +
-            `It works for one submission and expires ${expires}.\n`,
+        : `Hello${l.orgName ? ' ' + l.orgName : ''},\n\nHere is your link to add your monitoring data to the Sitka Sound Science Center Environmental Monitoring Data Portal:\n${l.link}\n\n` +
+            `It opens one form with your contact details, organization, project, station, sensor and device. ` +
+            `It works for one submission and expires ${expires}. We review every submission before it's saved.\n`,
     );
     return `mailto:${l.email ?? ''}?subject=${subject}&body=${body}`;
   }
