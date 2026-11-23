@@ -93,9 +93,10 @@ export class AdminDashboard implements OnInit {
     this.notice.set('');
     const result = await run();
     this.busyId.set('');
+    await this.refresh();
+    // Set after the reload, which clears old errors, so a failed action's message stays on screen.
     if (!result.ok) this.error.set(result.message);
     else done(result);
-    await this.refresh();
   }
 
   private keepLink(forId: string, r: Partial<NewLink>) {
