@@ -41,6 +41,8 @@ export class DataForm {
   readonly submitLabel = input('');
   /** Fires after a successful submit with a message to show. */
   readonly submitted = output<string>();
+  /** Fires when a submit starts, so the page can clear an old message. */
+  readonly started = output<void>();
 
   protected readonly def = computed<FormDef>(
     () => this.custom() ?? FORM_DEFS[this.form() ?? 'station'],
@@ -125,6 +127,7 @@ export class DataForm {
     this.error.set('');
     this.notice.set('');
     this.fieldError.set(null);
+    this.started.emit();
 
     const send = this.send();
     const result: Result<object> = send

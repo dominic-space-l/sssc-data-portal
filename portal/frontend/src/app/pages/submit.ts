@@ -76,7 +76,12 @@ import { SETTINGS } from '../settings';
           }
         </div>
         @if (form(); as f) {
-          <portal-data-form [form]="f" [code]="code" (submitted)="message.set($event)" />
+          <portal-data-form
+            [form]="f"
+            [code]="code"
+            (started)="message.set('')"
+            (submitted)="message.set($event)"
+          />
         }
       }
     } @else {

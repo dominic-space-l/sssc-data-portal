@@ -38,7 +38,7 @@ export const ADMIN_MENU: MenuItem[] = [
       @if (saved()) {
         <p class="success" role="status">{{ saved() }}</p>
       }
-      <portal-data-form [form]="f" (submitted)="saved.set($event)" />
+      <portal-data-form [form]="f" (started)="saved.set('')" (submitted)="saved.set($event)" />
     } @else {
       <h1>Add data</h1>
       <p class="muted">Pick a form. Everything you save here is added straight away.</p>
